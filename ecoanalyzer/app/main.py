@@ -1,8 +1,9 @@
+import datetime
+import os
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-import os
-import datetime
 
 app = FastAPI()
 
@@ -10,6 +11,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 start_time = datetime.datetime.utcnow()
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
