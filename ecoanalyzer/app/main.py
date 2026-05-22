@@ -1,9 +1,8 @@
-import datetime
-import os
-
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+import os
+import datetime
 
 app = FastAPI()
 
@@ -17,10 +16,13 @@ start_time = datetime.datetime.utcnow()
 def home():
     environment = os.getenv("ENVIRONMENT", "unknown")
     version = os.getenv("IMAGE_TAG", "latest")
-    timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    timestamp = datetime.datetime.utcnow().strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
     uptime = datetime.datetime.utcnow() - start_time
 
-    return f"""
+    return (
+        """
     <html>
         <head>
             <title>EcoAnalyzer — Dashboard</title>
@@ -39,33 +41,46 @@ def home():
                 <div class="cards">
                     <div class="card fade-in">
                         <div class="label">Entorno</div>
-                        <div class="value">{environment}</div>
+                        <div class="value">"""
+        + environment
+        + """</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Versión</div>
-                        <div class="value">{version}</div>
+                        <div class="value">"""
+        + version
+        + """</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Último despliegue</div>
-                        <div class="value">{timestamp}</div>
+                        <div class="value">"""
+        + timestamp
+        + """</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Tiempo activo</div>
-                        <div class="value">{str(uptime).split('.')[0]}</div>
+                        <div class="value">"""
+        + str(uptime).split(".")[0]
+        + """</div>
                     </div>
                 </div>
 
                 <canvas id="chart" width="400" height="200"></canvas>
 
-                <a class="btn" href="/docs">Ver documentación de la API</a>
+                <a class="btn" href="/docs">
+                    Ver documentación de la API
+                </a>
 
                 <footer>
-                    EcoAnalyzer © {datetime.datetime.utcnow().year} — Proyecto TFG
+                    EcoAnalyzer © """
+        + str(datetime.datetime.utcnow().year)
+        + """ — Proyecto TFG
                 </footer>
             </div>
         </body>
     </html>
     """
+    )
