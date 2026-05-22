@@ -1,4 +1,4 @@
-name: CI - Ecoanalyzer (Pro)
+name: CI - Ecoanalyzer (Pro, Full Enterprise)
 
 on:
   push:
@@ -11,21 +11,23 @@ on:
       - main
 
 jobs:
-  lint-test-build:
+  ci-pipeline:
+    name: "🚀 CI — Calidad, Seguridad, Pruebas y Build"
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      
+
     steps:
-      - name: Checkout
+      # 1. Preparación
+      - name: 📥 Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Configurar Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Cache pip
+      - name: ⚡ Restaurar caché pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -33,42 +35,83 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: 📦 Instalar dependencias del proyecto y herramientas
         run: |
           python -m pip install --upgrade pip
           pip install -r ecoanalyzer/requirements.txt
-          pip install black isort flake8 bandit pytest pytest-cov
+          pip install black isort flake8 bandit pytest pytest-cov safety \
+                     html5validator openapi-spec-validator \
+                     hadolint-py
+          # Pa11y y Trivy se ejecutan como acciones/containers
 
-
-      - name: Black (format check)
+      # 2. Calidad de código
+      - name: 🎨 Black — Validación de formato
         run: black --check ecoanalyzer/
 
-      - name: isort (import order check)
+      - name: 📚 isort — Validación de imports
         run: isort --check-only ecoanalyzer/
 
-      - name: flake8 (lint)
+      - name: 🔍 flake8 — Linting
         run: flake8 ecoanalyzer/
 
-      - name: Bandit (security scan)
+      # 3. Seguridad estática
+      - name: 🛡️ Bandit — Análisis SAST
         run: bandit -r ecoanalyzer/app
 
-      - name: Run tests with coverage
-        run: pytest ecoanalyzer/tests --cov=ecoanalyzer/app --cov-report=xml
+      - name: 🧪 Safety — Auditoría de dependencias
+        run: safety check --full-report
 
-      - name: Upload coverage report
+      # 4. Validación Dockerfile
+      - name: 🐳 Hadolint — Dockerfile Lint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      # 5. Tests unitarios e integración + cobertura
+      - name: 🧬 Ejecutar tests con cobertura mínima 80%
+        run: pytest ecoanalyzer/tests --cov=ecoanalyzer/app --cov-report=xml --cov-fail-under=80
+
+      - name: 📤 Subir reporte de cobertura
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
 
-      - name: Build Docker image
+      # 6. Validación OpenAPI
+      - name: 📘 Validar esquema OpenAPI
+        run: |
+          python - << 'EOF'
+          from app.main import app
+          from openapi_spec_validator import validate_spec
+          spec = app.openapi()
+          validate_spec(spec)
+          EOF
+        working-directory: ecoanalyzer
+
+      # 7. Validación HTML (si usas templates o HTML generado)
+      - name: 🌐 Validar HTML (si aplica)
+        run: |
+          html5validator --root ecoanalyzer --ignore "static"
+
+      # 8. Build de imagen Docker
+      - name: 🛠️ Build Docker image
         run: docker build -t ecoanalyzer:${{ github.sha }} .
 
-      - name: Save Docker image as artifact
-        run: |
-          docker save ecoanalyzer:${{ github.sha }} | gzip > ecoanalyzer.tar.gz
+      # 9. Trivy — Scan de la imagen Docker
+      - name: 🔍 Trivy — Scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "ecoanalyzer:${{ github.sha }}"
+          format: "table"
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "HIGH,CRITICAL"
 
-      - name: Upload Docker artifact
+      # 10. Guardar imagen como artefacto
+      - name: 📦 Guardar imagen Docker
+        run: docker save ecoanalyzer:${{ github.sha }} | gzip > ecoanalyzer.tar.gz
+
+      - name: 🚚 Subir artefacto Docker
         uses: actions/upload-artifact@v4
         with:
           name: ecoanalyzer-image

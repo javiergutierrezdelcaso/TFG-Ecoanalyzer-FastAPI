@@ -1,4 +1,4 @@
-name: Microservice CD (Docker)
+name: CD - Ecoanalyzer (Docker, Full Enterprise)
 
 on:
   push:
@@ -8,14 +8,19 @@ on:
 
 jobs:
   deploy:
+    name: "🚀 CD — Build, Push & Deploy to Azure"
     runs-on: ubuntu-latest
 
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'preproduction' }}
+      url: ${{ steps.healthcheck.outputs.app-url }}
 
-      - name: Select environment
+    steps:
+      # 1. Preparación
+      - name: 📥 Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: 🧭 Seleccionar entorno (PRE o PRO)
         id: env
         run: |
           if [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
@@ -26,24 +31,61 @@ jobs:
             echo "tag=pro" >> $GITHUB_OUTPUT
           fi
 
-      - name: Log in to GHCR
+      - name: 📝 Mostrar entorno seleccionado
+        run: |
+          echo "Entorno: ${{ steps.env.outputs.tag }}"
+          echo "App Service: ${{ steps.env.outputs.app }}"
+
+      # 2. Build & Push imagen Docker a GHCR
+      - name: 🔐 Login en GHCR
         run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build Docker image
-        run: |
-          docker build -t ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }} .
+      - name: 🛠️ Build Docker image para entorno
+        run: docker build -t ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }} .
 
-      - name: Push Docker image
-        run: |
-          docker push ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+      - name: 🔍 Validar imagen Docker construida
+        run: docker image inspect ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
 
-      - name: Azure Login
+      - name: 🚀 Push Docker image a GHCR
+        run: docker push ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+
+      # 3. Login en Azure
+      - name: 🔐 Login en Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy container to Azure App Service
+      # 4. Despliegue en Azure App Service
+      - name: 🚀 Deploy contenedor en Azure App Service
+        id: deploy
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ steps.env.outputs.app }}
           images: ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+
+      # 5. Healthcheck + smoke tests
+      - name: ⏳ Esperar a que el servicio responda (healthcheck)
+        id: healthcheck
+        run: |
+          APP_URL="https://${{ steps.env.outputs.app }}.azurewebsites.net"
+          echo "app-url=$APP_URL" >> $GITHUB_OUTPUT
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL")
+            echo "Intento $i — Código HTTP: $STATUS"
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Servicio operativo"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "❌ El servicio no respondió correctamente"
+          exit 1
+
+      - name: 🩺 Smoke test — Home responde y contiene título
+        run: |
+          APP_URL="https://${{ steps.env.outputs.app }}.azurewebsites.net"
+          BODY=$(curl -s "$APP_URL")
+          echo "$BODY" | grep -q "EcoAnalyzer" || (echo "❌ No se encontró 'EcoAnalyzer' en la home" && exit 1)
+
+      # 6. (Opcional) DAST / accesibilidad en entorno real
+      # Aquí podrías añadir ZAP o Pa11y apuntando a $APP_URL si quieres rizar el rizo.
