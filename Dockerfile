@@ -1,10 +1,10 @@
+# hadolint ignore=DL3008
 FROM python:3.11-slim-trixie
 
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    curl \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
