@@ -1,13 +1,23 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 import os
 import datetime
 
 app = FastAPI()
 
-# Montar carpeta /static
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Ruta absoluta al directorio actual
+BASE_DIR = Path(__file__).resolve().parent
+
+# Carpeta static dentro de ecoanalyzer/app/
+STATIC_DIR = BASE_DIR / "static"
+
+# Crear carpeta si no existe
+STATIC_DIR.mkdir(exist_ok=True)
+
+# Montar carpeta static
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 start_time = datetime.datetime.utcnow()
 
