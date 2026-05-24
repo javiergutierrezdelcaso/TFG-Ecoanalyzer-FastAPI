@@ -7,22 +7,46 @@ import datetime
 
 app = FastAPI()
 
-# Ruta absoluta al directorio actual
 BASE_DIR = Path(__file__).resolve().parent
-
-# Carpeta static dentro de ecoanalyzer/app/
 STATIC_DIR = BASE_DIR / "static"
-
-# Crear carpeta si no existe
 STATIC_DIR.mkdir(exist_ok=True)
 
-# Montar carpeta static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 start_time = datetime.datetime.utcnow()
 
 
-@app.get("/", response_class=HTMLResponse)
+# Endpoint principal JSON
+@app.get("/")
+def root():
+    return {
+        "service": "EcoAnalyzer",
+        "status": "running",
+        "environment": os.getenv("ENVIRONMENT", "unknown"),
+        "version": os.getenv("IMAGE_TAG", "latest"),
+    }
+
+
+# Healthcheck
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy"
+    }
+
+
+# Endpoint de análisis
+@app.get("/analysis")
+def analysis():
+    return {
+        "co2": 42,
+        "energy": 120,
+        "efficiency": "good"
+    }
+
+
+# Dashboard HTML opcional
+@app.get("/dashboard", response_class=HTMLResponse)
 def home():
     environment = os.getenv("ENVIRONMENT", "unknown")
     version = os.getenv("IMAGE_TAG", "latest")
@@ -31,8 +55,7 @@ def home():
     )
     uptime = datetime.datetime.utcnow() - start_time
 
-    return (
-        """
+    return f"""
     <html>
         <head>
             <title>EcoAnalyzer — Dashboard</title>
@@ -51,30 +74,22 @@ def home():
                 <div class="cards">
                     <div class="card fade-in">
                         <div class="label">Entorno</div>
-                        <div class="value">"""
-        + environment
-        + """</div>
+                        <div class="value">{environment}</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Versión</div>
-                        <div class="value">"""
-        + version
-        + """</div>
+                        <div class="value">{version}</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Último despliegue</div>
-                        <div class="value">"""
-        + timestamp
-        + """</div>
+                        <div class="value">{timestamp}</div>
                     </div>
 
                     <div class="card fade-in">
                         <div class="label">Tiempo activo</div>
-                        <div class="value">"""
-        + str(uptime).split(".")[0]
-        + """</div>
+                        <div class="value">{str(uptime).split(".")[0]}</div>
                     </div>
                 </div>
 
@@ -85,12 +100,9 @@ def home():
                 </a>
 
                 <footer>
-                    EcoAnalyzer © """
-        + str(datetime.datetime.utcnow().year)
-        + """ — Proyecto TFG
+                    EcoAnalyzer © {datetime.datetime.utcnow().year} — Proyecto TFG
                 </footer>
             </div>
         </body>
     </html>
     """
-    )
