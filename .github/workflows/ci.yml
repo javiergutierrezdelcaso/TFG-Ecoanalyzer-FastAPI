@@ -68,8 +68,7 @@ jobs:
           dockerfile: Dockerfile
       - name: 🧪 Set PYTHONPATH
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
-      - name: 🧬 Ejecutar tests con cobertura mínima 80%
-        run: pytest -v --cov=ecoanalyzer.app --cov-report=xml --cov-fail-under=80
+
       # 5. Tests unitarios e integración + cobertura
       - name: 🧬 Ejecutar tests con cobertura mínima 80%
         run: pytest ecoanalyzer/tests --cov=ecoanalyzer/app --cov-report=xml --cov-fail-under=80
