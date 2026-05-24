@@ -1,27 +1,24 @@
 FROM python:3.10-slim-bookworm
-RUN apt-get update && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
-# Establecer directorio de trabajo
+
 WORKDIR /app
 
-# Copiar requirements desde ecoanalyzer
-COPY ecoanalyzer/requirements.txt .
+RUN apt-get update && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalar dependencias Python
+COPY requirements.txt .
+
 RUN pip install --no-cache-dir --upgrade \
     pip==25.2 \
-    setuptools==80.9.0 \
+    setuptools==80.9.0
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install --no-cache-dir \
     wheel==0.46.2 \
     jaraco.context==6.1.0
 
-# Copiar el código del microservicio
-COPY ecoanalyzer/ .
+COPY . .
 
-# Copiar carpeta de archivos estáticos (CSS, JS, imágenes)
-COPY ecoanalyzer/static /app/static
-
-# Exponer puerto FastAPI
 EXPOSE 8000
 
-# Comando de arranque
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "ecoanalyzer.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
