@@ -7,54 +7,48 @@ import datetime
 
 app = FastAPI()
 
-# Ruta absoluta del directorio actual
 BASE_DIR = Path(__file__).resolve().parent
-
-# Carpeta static
 STATIC_DIR = BASE_DIR / "static"
 
-# Crear carpeta static si no existe
 STATIC_DIR.mkdir(exist_ok=True)
 
-# Montar archivos estáticos
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 start_time = datetime.datetime.utcnow()
 
 
-# Endpoint principal
 @app.get("/")
 def root():
     return {
-        "service": "EcoAnalyzer",
+        "service": "ecoanalyzer",
         "status": "running",
         "environment": os.getenv("ENVIRONMENT", "unknown"),
         "version": os.getenv("IMAGE_TAG", "latest"),
     }
 
 
-# Endpoint healthcheck
 @app.get("/health")
 def health():
     return {
-        "status": "healthy"
+        "status": "ok"
     }
 
 
-# Endpoint de análisis
 @app.get("/analysis")
 def analysis():
     return {
-        "co2": 42,
-        "energy": 120,
-        "efficiency": "good",
+        "result": {
+            "co2": 42,
+            "energy": 120,
+            "efficiency": "good",
+        }
     }
 
 
-# Dashboard HTML
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     environment = os.getenv("ENVIRONMENT", "unknown")
+
     version = os.getenv("IMAGE_TAG", "latest")
 
     timestamp = datetime.datetime.utcnow().strftime(
@@ -68,7 +62,7 @@ def dashboard():
     return f"""
     <html>
         <head>
-            <title>EcoAnalyzer — Dashboard</title>
+            <title>EcoAnalyzer Dashboard</title>
 
             <link
                 rel="stylesheet"
