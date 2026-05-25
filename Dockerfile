@@ -1,19 +1,21 @@
-FROM python:3.10-slim
+FROM python:3.11-slim-trixie
 
-# Directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Copiar requirements desde la carpeta ecoanalyzer
-COPY ecoanalyzer/requirements.txt .
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalar dependencias
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
 
-# Copiar todo el código del microservicio
-COPY ecoanalyzer/ .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    pip==25.2 \
+    setuptools>=81.0.0 \
+    wheel==0.46.2 \
+    jaraco.context==6.1.0 \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Exponer el puerto donde correrá FastAPI
-EXPOSE 8000
+COPY . .
 
-# Comando de arranque del microservicio
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
