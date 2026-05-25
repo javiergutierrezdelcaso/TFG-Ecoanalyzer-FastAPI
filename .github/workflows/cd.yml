@@ -24,10 +24,10 @@ jobs:
         id: env
         run: |
           if [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
-            echo "app=${{ secrets.AZURE_WEBAPP_NAME_PRE }}" >> $GITHUB_OUTPUT
+            echo "app=ecoanalyzer-pre-app" >> $GITHUB_OUTPUT
             echo "tag=pre" >> $GITHUB_OUTPUT
           else
-            echo "app=${{ secrets.AZURE_WEBAPP_NAME_PRO }}" >> $GITHUB_OUTPUT
+            echo "app=ecoanalyzer-pro-app" >> $GITHUB_OUTPUT
             echo "tag=pro" >> $GITHUB_OUTPUT
           fi
 
