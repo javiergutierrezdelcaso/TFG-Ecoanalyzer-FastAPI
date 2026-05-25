@@ -6,6 +6,9 @@ on:
       - develop
       - main
 
+env:
+  IMAGE_NAME: ghcr.io/javiergutierrezdelcaso/microservicio/ecoanalyzer
+
 jobs:
   deploy:
     name: "🚀 CD — Build, Push & Deploy to Azure"
@@ -16,10 +19,11 @@ jobs:
       url: ${{ steps.healthcheck.outputs.app-url }}
 
     steps:
-      # 1. Preparación
+      # 1. Checkout
       - name: 📥 Checkout del repositorio
         uses: actions/checkout@v4
 
+      # 2. Selección dinámica de entorno
       - name: 🧭 Seleccionar entorno (PRE o PRO)
         id: env
         run: |
@@ -35,57 +39,90 @@ jobs:
         run: |
           echo "Entorno: ${{ steps.env.outputs.tag }}"
           echo "App Service: ${{ steps.env.outputs.app }}"
+          echo "Docker Image: $IMAGE_NAME:${{ steps.env.outputs.tag }}"
 
-      # 2. Build & Push imagen Docker a GHCR
+      # 3. Login en GHCR
       - name: 🔐 Login en GHCR
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
+            -u ${{ github.actor }} \
+            --password-stdin
 
-      - name: 🛠️ Build Docker image para entorno
-        run: docker build -t ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }} .
+      # 4. Build imagen Docker
+      - name: 🛠️ Build Docker image
+        run: |
+          docker build \
+            -t $IMAGE_NAME:${{ steps.env.outputs.tag }} \
+            .
 
+      # 5. Validación imagen
       - name: 🔍 Validar imagen Docker construida
-        run: docker image inspect ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+        run: |
+          docker image inspect \
+            $IMAGE_NAME:${{ steps.env.outputs.tag }}
 
+      # 6. Push a GHCR
       - name: 🚀 Push Docker image a GHCR
-        run: docker push ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+        run: |
+          docker push \
+            $IMAGE_NAME:${{ steps.env.outputs.tag }}
 
-      # 3. Login en Azure
+      # 7. Login Azure
       - name: 🔐 Login en Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 4. Despliegue en Azure App Service
+      # 8. Deploy App Service
       - name: 🚀 Deploy contenedor en Azure App Service
         id: deploy
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ steps.env.outputs.app }}
-          images: ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
+          images: $IMAGE_NAME:${{ steps.env.outputs.tag }}
 
-      # 5. Healthcheck + smoke tests
-      - name: ⏳ Esperar a que el servicio responda (healthcheck)
+      # 9. Esperar disponibilidad
+      - name: ⏳ Esperar a que el servicio responda
         id: healthcheck
         run: |
           APP_URL="https://${{ steps.env.outputs.app }}.azurewebsites.net"
+
           echo "app-url=$APP_URL" >> $GITHUB_OUTPUT
-          for i in {1..10}; do
+
+          echo "Comprobando disponibilidad de $APP_URL"
+
+          for i in {1..15}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL")
-            echo "Intento $i — Código HTTP: $STATUS"
+
+            echo "Intento $i — HTTP $STATUS"
+
             if [ "$STATUS" -eq 200 ]; then
-              echo "Servicio operativo"
+              echo "✅ Servicio operativo"
               exit 0
             fi
-            sleep 5
+
+            sleep 10
           done
+
           echo "❌ El servicio no respondió correctamente"
           exit 1
 
-      - name: 🩺 Smoke test — Home responde y contiene título
+      # 10. Smoke Test
+      - name: 🩺 Smoke test — Validar contenido
         run: |
           APP_URL="https://${{ steps.env.outputs.app }}.azurewebsites.net"
-          BODY=$(curl -s "$APP_URL")
-          echo "$BODY" | grep -q "EcoAnalyzer" || (echo "❌ No se encontró 'EcoAnalyzer' en la home" && exit 1)
 
-      # 6. (Opcional) DAST / accesibilidad en entorno real
-      # Aquí podrías añadir ZAP o Pa11y apuntando a $APP_URL si quieres rizar el rizo.
+          BODY=$(curl -s "$APP_URL")
+
+          echo "$BODY" | grep -q "EcoAnalyzer" || (
+            echo "❌ No se encontró 'EcoAnalyzer' en la home"
+            exit 1
+          )
+
+          echo "✅ Smoke test superado"
+
+      # 11. Información final
+      - name: ✅ Deployment completado
+        run: |
+          echo "Aplicación desplegada correctamente:"
+          echo "https://${{ steps.env.outputs.app }}.azurewebsites.net"
