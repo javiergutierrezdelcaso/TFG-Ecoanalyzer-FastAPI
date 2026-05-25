@@ -126,6 +126,3 @@ jobs:
         run: |
           echo "Aplicación desplegada correctamente:"
           echo "https://${{ steps.env.outputs.app }}.azurewebsites.net"
-        with:
-          app-name: ${{ steps.env.outputs.app }}
-          images: ghcr.io/${{ github.repository }}/ecoanalyzer:${{ steps.env.outputs.tag }}
