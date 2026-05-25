@@ -79,7 +79,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ steps.env.outputs.app }}
-          images: $IMAGE_NAME:${{ steps.env.outputs.tag }}
+          images: ${{ env.IMAGE_NAME }}:${{ steps.env.outputs.tag }}
 
       # 9. Esperar disponibilidad
       - name: ⏳ Esperar a que el servicio responda
