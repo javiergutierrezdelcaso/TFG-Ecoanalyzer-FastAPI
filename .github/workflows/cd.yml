@@ -10,7 +10,7 @@ env:
 
 on:
   workflow_run:
-    workflows: ["ci.yml"]
+    workflows: ["Microservice CI.yml"]
     types:
       - completed
 
