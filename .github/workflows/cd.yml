@@ -66,12 +66,30 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: 🚀 Deploy contenedor en Azure App Service
-        id: deploy
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ steps.env.outputs.app }}
-          images: ${{ env.IMAGE_NAME }}:${{ steps.env.outputs.tag }}
+      - name: 🚀 Desplegar en VM via SSH
+        run: |
+          # Obtener IP pública de la VM
+          VM_IP=$(az vm show -d -g rg-tfg-pre -n vm-tfg-pre --query publicIps -o tsv)
+          
+          # Conectar por SSH y desplegar
+          ssh -o StrictHostKeyChecking=no azureuser@$VM_IP << 'EOF'
+            # Detener contenedor anterior si existe
+            docker stop ecoanalyzer 2>/dev/null || true
+            docker rm ecoanalyzer 2>/dev/null || true
+            
+            # Iniciar sesión en GHCR
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Descargar y ejecutar la nueva imagen
+            docker pull ${{ env.IMAGE_NAME }}:${{ steps.env.outputs.tag }}
+            
+            docker run -d \
+              --name ecoanalyzer \
+              --restart unless-stopped \
+              -p 80:5000 \
+              -e ASPNETCORE_ENVIRONMENT=${{ steps.env.outputs.tag }} \
+              ${{ env.IMAGE_NAME }}:${{ steps.env.outputs.tag }}
+          EOF
 
       - name: ⏳ Esperar a que el servicio responda
         id: healthcheck
