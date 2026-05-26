@@ -1,31 +1,50 @@
-name: Microservice CI
+name: CI — Validación de Pull Request
 
+# Se dispara en cada Pull Request hacia main
 on:
-  push:
-    branches:
-      - develop
   pull_request:
     branches:
-      - develop
       - main
 
 jobs:
-  test:
+  ci:
+    name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      # 1. Checkout del código de la PR
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-      - name: Install PowerShell
-        uses: PowerShell/PowerShell-For-GitHub-Actions@v1
+      # 2. Configurar Python
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Install Pode & Pester
-        shell: pwsh
+      # 3. Instalar dependencias
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # 4. Análisis de código con flake8 (calidad y estilo)
+      - name: Análisis de código (flake8)
         run: |
-          Install-Module Pode -Force
-          Install-Module Pester -Force
+          pip install flake8
+          flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      - name: Run Pester Tests
-        shell: pwsh
+      # 5. Pruebas automatizadas con cobertura
+      - name: Pruebas y cobertura de código
         run: |
-          Invoke-Pester ./tests/EcoAnalyzer.Tests.ps1 -Passthru
+          pytest test_main.py -v \
+            --cov=main \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+
+      # 6. Publicar resultado de cobertura como comentario en la PR
+      - name: Publicar cobertura en PR
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
