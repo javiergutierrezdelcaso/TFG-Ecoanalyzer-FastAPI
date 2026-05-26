@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
@@ -10,7 +10,7 @@ from typing import Optional
 app = FastAPI(
     title="EcoAnalyzer API",
     description="Microservicio de análisis de eficiencia energética",
-    version="2.0.0",
+    version="2.0.0"
 )
 
 BASE_DIR = Path(__file__).resolve().parent
