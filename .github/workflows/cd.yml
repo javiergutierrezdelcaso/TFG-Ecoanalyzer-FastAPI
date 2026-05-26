@@ -10,7 +10,7 @@ env:
 
 on:
   workflow_run:
-    workflows: ["Microservice CI.yml"]
+    workflows: ["CI - Ecoanalyzer (Pro, Full Enterprise)"]
     types:
       - completed
 
