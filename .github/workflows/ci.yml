@@ -1,0 +1,50 @@
+name: CI — Validación de Pull Request
+
+# Se dispara en cada Pull Request hacia main
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    name: Compilación, análisis y pruebas
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del código de la PR
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # 2. Configurar Python
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. Instalar dependencias
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # 4. Análisis de código con flake8 (calidad y estilo)
+      - name: Análisis de código (flake8)
+        run: |
+          pip install flake8
+          flake8 . --max-line-length=120 --exclude=.git,__pycache__
+
+      # 5. Pruebas automatizadas con cobertura
+      - name: Pruebas y cobertura de código
+        run: |
+          pytest test_main.py -v \
+            --cov=main \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+
+      # 6. Publicar resultado de cobertura como comentario en la PR
+      - name: Publicar cobertura en PR
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
