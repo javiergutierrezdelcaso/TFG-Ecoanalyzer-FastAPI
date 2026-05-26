@@ -44,7 +44,7 @@ jobs:
       # 6. Publicar resultado de cobertura como comentario en la PR
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: .coverage
