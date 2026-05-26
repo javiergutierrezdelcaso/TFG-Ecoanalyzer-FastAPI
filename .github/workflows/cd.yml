@@ -10,9 +10,10 @@ env:
 
 on:
   workflow_run:
-    workflows: ["CI - Ecoanalyzer (Pro, Full Enterprise)"]
+    workflows: ["ci.yml"]
     types:
       - completed
+
 
 jobs:
   deploy:
