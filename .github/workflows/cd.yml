@@ -61,6 +61,7 @@ jobs:
           docker image inspect \
             $IMAGE_NAME:${{ steps.env.outputs.tag }}
 
+            
       # 6. Push a GHCR
       - name: 🚀 Push Docker image a GHCR
         run: |
