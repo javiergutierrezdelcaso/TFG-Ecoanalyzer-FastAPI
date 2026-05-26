@@ -1,26 +1,25 @@
 name: CD - Ecoanalyzer (Docker, Full Enterprise)
 
+on:
+  workflow_run:
+    workflows: ["CI - Ecoanalyzer (Pro, Full Enterprise)"]
+    types: [completed]
+
 permissions:
   contents: read
   packages: write
   id-token: write
 
-env:
-  IMAGE_NAME: ghcr.io/javiergutierrezdelcaso/microservicio/ecoanalyzer
-
-on:
-  workflow_run:
-    workflows: ["CI - Ecoanalyzer (Pro, Full Enterprise)"]
-    types:
-      - completed
-
-
 jobs:
   deploy:
+    if: >
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          (github.event.workflow_run.head_branch == 'develop' ||
+           github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
-
-
     steps:
+      # ... tus pasos
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -43,11 +42,10 @@ jobs:
           echo "Docker Image: $IMAGE_NAME:${{ steps.env.outputs.tag }}"
 
       # 3. Login en GHCR
+      
       - name: 🔐 Login en GHCR
-        run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
-            -u ${{ github.actor }} \
-            --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
 
       # 4. Build imagen Docker
       - name: 🛠️ Build Docker image
