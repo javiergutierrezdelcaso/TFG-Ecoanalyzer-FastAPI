@@ -23,48 +23,65 @@ jobs:
         env:
           TF_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: |
-          echo "Iniciando consulta simplificada a los Estados de Terraform Cloud..."
+          echo "=== OBTENIENDO CONFIGURACIÓN DE ENTORNO PRE ==="
           
-          # 1. Obtener IP de PRE (Buscando directamente en los outputs del estado actual)
-          echo "Solicitando IP de PRE..."
-          RESPONSE_PRE=$(curl -s \
+          # 1. Conseguir el ID interno del Workspace de PRE
+          WORKSPACE_PRE_ID=$(curl -s \
             --header "Authorization: Bearer $TF_TOKEN" \
             --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pre/current-state-version-outputs")
+            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pre" \
+            | jq -r '.data.id // empty')
 
-          # Extraemos la IP controlando que la clave exista
-          IP_PRE=$(echo "$RESPONSE_PRE" | jq -r 'if .data then [.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value][0] else empty end' | tr -d '"')
+          if [ -z "$WORKSPACE_PRE_ID" ] || [ "$WORKSPACE_PRE_ID" == "null" ]; then
+            echo "❌ Error: No se pudo encontrar el Workspace 'Infraestructura_Pre'. Revisa si el nombre tiene mayúsculas/minúsculas distintas en la UI de Terraform Cloud."
+            exit 1
+          fi
+          echo "ID de Workspace PRE encontrado: $WORKSPACE_PRE_ID"
 
-          # 2. Obtener IP de PRO
-          echo "Solicitando IP de PRO..."
-          RESPONSE_PRO=$(curl -s \
+          # 2. Conseguir la IP de PRE usando su ID interno
+          IP_PRE=$(curl -s \
             --header "Authorization: Bearer $TF_TOKEN" \
             --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pro/current-state-version-outputs")
+            "https://app.terraform.io/api/v2/workspaces/$WORKSPACE_PRE_ID/current-state-version-outputs" \
+            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value // empty' | tr -d '"')
 
-          # Extraemos la IP controlando que la clave exista
-          IP_PRO=$(echo "$RESPONSE_PRO" | jq -r 'if .data then [.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value][0] else empty end' | tr -d '"')
 
-          # Impresión para depuración en los logs de GitHub Actions
-          echo "Resultados obtenidos:"
-          echo "-> IP PRE: [${IP_PRE}]"
-          echo "-> IP PRO: [${IP_PRO}]"
+          echo "=== OBTENIENDO CONFIGURACIÓN DE ENTORNO PRO ==="
 
-          # Validaciones rigurosas
-          if [ -z "$IP_PRE" ] || [ "$IP_PRE" == "null" ] || [ -z "$IP_PRO" ] || [ "$IP_PRO" == "null" ]; then
-            echo "❌ Error Crítico: No se pudo parsear la IP."
-            echo "Asegúrate de que en tu código de Terraform tengas definido el bloque de output exactamente así:"
-            echo 'output "vm_public_ip" { value = ... }'
-            echo ""
-            echo "Respuesta cruda de PRE para debugear:"
-            echo "$RESPONSE_PRE" | jq . 2>/dev/null || echo "$RESPONSE_PRE"
+          # 3. Conseguir el ID interno del Workspace de PRO
+          WORKSPACE_PRO_ID=$(curl -s \
+            --header "Authorization: Bearer $TF_TOKEN" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pro" \
+            | jq -r '.data.id // empty')
+
+          if [ -z "$WORKSPACE_PRO_ID" ] || [ "$WORKSPACE_PRO_ID" == "null" ]; then
+            echo "❌ Error: No se pudo encontrar el Workspace 'Infraestructura_Pro'."
+            exit 1
+          fi
+          echo "ID de Workspace PRO encontrado: $WORKSPACE_PRO_ID"
+
+          # 4. Conseguir la IP de PRO usando su ID interno
+          IP_PRO=$(curl -s \
+            --header "Authorization: Bearer $TF_TOKEN" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/workspaces/$WORKSPACE_PRO_ID/current-state-version-outputs" \
+            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value // empty' | tr -d '"')
+
+
+          echo "=== VALIDACIÓN FINAL ==="
+          echo "-> IP PRE extraída: [${IP_PRE}]"
+          echo "-> IP PRO extraída: [${IP_PRO}]"
+
+          if [ -z "$IP_PRE" ] || [ -z "$IP_PRO" ]; then
+            echo "❌ Error Crítico: Las IPs se leyeron vacías. Asegúrate de que el output 'vm_public_ip' esté declarado en tu código de Terraform y guardado en el State actual."
             exit 1
           fi
 
-          # Guardar outputs finales de GitHub Actions si pasa el filtro
+          # Exportar outputs hacia los siguientes Jobs del pipeline
           echo "ip_pre=${IP_PRE}" >> $GITHUB_OUTPUT
           echo "ip_pro=${IP_PRO}" >> $GITHUB_OUTPUT
-          echo "✅ IPs almacenadas en las variables del pipeline con éxito."
+          echo "✅ Proceso completado con éxito."
   # ─────────────────────────────────────────────
   # JOB 1: Las mismas validaciones que CI
   # ─────────────────────────────────────────────
