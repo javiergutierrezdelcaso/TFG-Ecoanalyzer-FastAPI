@@ -195,7 +195,8 @@ jobs:
             sudo systemctl restart microservicio
             sudo systemctl status microservicio
           EOF
-
+      - name: Esperar a que el servicio levante
+        run: sleep 30
       - name: Health check PRO
         run: |
           curl --fail --retry 5 --retry-delay 5 \
