@@ -7,13 +7,12 @@ on:
       - main
 
 jobs:
-  # ─────────────────────────────────────────────
+ # ─────────────────────────────────────────────
   # JOB 0: Obtención dinámica de IPs desde Terraform Cloud
   # ─────────────────────────────────────────────
   resolver-ips:
     name: Obtener IPs desde Terraform Cloud
     runs-on: ubuntu-latest
-    # Forzamos un environment para que GitHub Actions libere el secreto TF_API_TOKEN
     environment: pro
     outputs:
       ip_pre: ${{ steps.get_ips.outputs.ip_pre }}
@@ -24,38 +23,48 @@ jobs:
         env:
           TF_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: |
-          echo "Iniciando consulta simplificada a Terraform Cloud..."
+          echo "Iniciando consulta simplificada a los Estados de Terraform Cloud..."
           
-          # 1. Obtener IP de PRE (Usando la ruta directa por nombre de Workspace)
+          # 1. Obtener IP de PRE (Buscando directamente en los outputs del estado actual)
           echo "Solicitando IP de PRE..."
-          IP_PRE=$(curl -s \
+          RESPONSE_PRE=$(curl -s \
             --header "Authorization: Bearer $TF_TOKEN" \
             --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pre/current-state-version-outputs" \
-            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value // empty' | tr -d '"')
+            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pre/current-state-version-outputs")
+
+          # Extraemos la IP controlando que la clave exista
+          IP_PRE=$(echo "$RESPONSE_PRE" | jq -r 'if .data then [.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value][0] else empty end' | tr -d '"')
 
           # 2. Obtener IP de PRO
           echo "Solicitando IP de PRO..."
-          IP_PRO=$(curl -s \
+          RESPONSE_PRO=$(curl -s \
             --header "Authorization: Bearer $TF_TOKEN" \
             --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pro/current-state-version-outputs" \
-            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value // empty' | tr -d '"')
+            "https://app.terraform.io/api/v2/organizations/ecoanalyzer-org/workspaces/Infraestructura_Pro/current-state-version-outputs")
 
-          # Validaciones e impresión de respuestas para depuración
+          # Extraemos la IP controlando que la clave exista
+          IP_PRO=$(echo "$RESPONSE_PRO" | jq -r 'if .data then [.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value][0] else empty end' | tr -d '"')
+
+          # Impresión para depuración en los logs de GitHub Actions
           echo "Resultados obtenidos:"
           echo "-> IP PRE: [${IP_PRE}]"
           echo "-> IP PRO: [${IP_PRO}]"
 
-          if [ -z "$IP_PRE" ] || [ -z "$IP_PRO" ]; then
-            echo "❌ Error Crítico: No se pudo obtener una o ambas IPs. Verifica que el Token sea correcto y que el Output 'vm_public_ip' exista en Terraform Cloud."
+          # Validaciones rigurosas
+          if [ -z "$IP_PRE" ] || [ "$IP_PRE" == "null" ] || [ -z "$IP_PRO" ] || [ "$IP_PRO" == "null" ]; then
+            echo "❌ Error Crítico: No se pudo parsear la IP."
+            echo "Asegúrate de que en tu código de Terraform tengas definido el bloque de output exactamente así:"
+            echo 'output "vm_public_ip" { value = ... }'
+            echo ""
+            echo "Respuesta cruda de PRE para debugear:"
+            echo "$RESPONSE_PRE" | jq . 2>/dev/null || echo "$RESPONSE_PRE"
             exit 1
           fi
 
-          # Guardar outputs de GitHub Actions
+          # Guardar outputs finales de GitHub Actions si pasa el filtro
           echo "ip_pre=${IP_PRE}" >> $GITHUB_OUTPUT
           echo "ip_pro=${IP_PRO}" >> $GITHUB_OUTPUT
-          echo "✅ IPs guardadas en el output del pipeline con éxito."
+          echo "✅ IPs almacenadas en las variables del pipeline con éxito."
   # ─────────────────────────────────────────────
   # JOB 1: Las mismas validaciones que CI
   # ─────────────────────────────────────────────
