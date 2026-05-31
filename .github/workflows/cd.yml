@@ -39,17 +39,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 1. Autenticarse en Azure de forma segura
+      - name: Login en Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS1 }}
+
+      # 2. Consultar la IP real directamente a Azure (Cambia el nombre de la VM y el Resource Group por los tuyos)
+      - name: Obtener IP de PRE desde Azure
+        id: get_ip
+        run: |
+          echo "Consultando la IP pública real en Azure..."
+          IP_PRE=$(az network public-ip show \
+            --resource-group rg-tfg-pre \
+            --name pip-tfg-pre \
+            --query ipAddress -o tsv)
+
+          if [ -z "$IP_PRE" ] || [ "$IP_PRE" == "null" ]; then
+            echo "❌ Error: Azure no ha asignado todavía una IP pública a este recurso."
+            exit 1
+          fi
+
+          echo "IP de PRE detectada en Azure: $IP_PRE"
+          echo "vm_ip=${IP_PRE}" >> $GITHUB_OUTPUT
+
       - name: Configurar clave SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa_tfg
           chmod 600 ~/.ssh/id_rsa_tfg
-          ssh-keyscan -H ${{ vars.VM_IP_PRE }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ steps.get_ip.outputs.vm_ip }} >> ~/.ssh/known_hosts
 
       - name: Copiar código a PRE
         run: |
           scp -i ~/.ssh/id_rsa_tfg main.py requirements.txt \
-            azureuser@${{ vars.VM_IP_PRE }}:/opt/microservicio/
+            azureuser@${{ steps.get_ip.outputs.vm_ip }}:/opt/microservicio/
 
       - name: Reinstalar dependencias y reiniciar servicio en PRE
         run: |
@@ -78,7 +102,7 @@ jobs:
       - name: Health check PRE
         run: |
           curl --fail --retry 5 --retry-delay 5 \
-            http://${{ vars.VM_IP_PRE }}:8000/health
+            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/health
 
       - name: Verificar landing page PRE
         run: |
@@ -118,17 +142,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 1. Autenticarse en Azure para el entorno PRO
+      - name: Login en Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS1 }}
+
+      # 2. Consultar la IP real de PRO directamente a Azure (Cambia los nombres por los tuyos de PRO)
+      - name: Obtener IP de PRO desde Azure
+        id: get_ip_pro
+        run: |
+          echo "Consultando la IP pública real de PRO en Azure..."
+          IP_PRO=$(az network public-ip show \
+            --resource-group rg-tfg-pro \
+            --name pip-tfg-pro \
+            --query ipAddress -o tsv)
+
+          if [ -z "$IP_PRO" ] || [ "$IP_PRO" == "null" ]; then
+            echo "❌ Error: Azure no ha asignado todavía una IP pública a PRO."
+            exit 1
+          fi
+
+          echo "IP de PRO detectada en Azure: $IP_PRO"
+          echo "vm_ip=${IP_PRO}" >> $GITHUB_OUTPUT
+
       - name: Configurar clave SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa_tfg
           chmod 600 ~/.ssh/id_rsa_tfg
-          ssh-keyscan -H ${{ vars.VM_IP_PRO }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ steps.get_ip_pro.outputs.vm_ip }} >> ~/.ssh/known_hosts
 
       - name: Copiar código a PRO
         run: |
           scp -i ~/.ssh/id_rsa_tfg main.py requirements.txt \
-            azureuser@${{ vars.VM_IP_PRO }}:/opt/microservicio/
+            azureuser@${{ steps.get_ip_pro.outputs.vm_ip }}:/opt/microservicio/
 
       - name: Reinstalar dependencias y reiniciar servicio en PRO
         run: |
