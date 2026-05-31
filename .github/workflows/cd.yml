@@ -13,7 +13,7 @@ jobs:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -40,7 +40,7 @@ jobs:
     outputs:
       vm_ip: ${{ steps.get_ip.outputs.vm_ip }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Login en Azure CLI
         uses: azure/login@v2
@@ -148,7 +148,7 @@ jobs:
     needs: pruebas-integracion
     environment: pro
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Login en Azure CLI
         uses: azure/login@v2
