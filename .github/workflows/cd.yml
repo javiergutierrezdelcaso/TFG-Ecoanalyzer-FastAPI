@@ -32,35 +32,25 @@ jobs:
   # JOB 2: Obtener IP de PRE desde Terraform Cloud
   # ─────────────────────────────────────────────
   obtener-ip-pre:
-    name: Obtener IP PRE desde Terraform Cloud
-    runs-on: ubuntu-latest
-    needs: validacion
-    outputs:
-      vm_ip: ${{ steps.tf_output.outputs.vm_ip }}
-    steps:
-      - name: Obtener IP de VM PRE
-        id: tf_output
-        run: |
-          WORKSPACE_ID=$(curl -s \
-            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
-            --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/organizations/${{ vars.TF_ORGANIZATION }}/workspaces/Infraestructura_Pre" \
-            | jq -r '.data.id')
- 
-          VM_IP=$(curl -s \
-            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
-            --header "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/workspaces/${WORKSPACE_ID}/current-state-version-outputs" \
-            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value' \
-            | tr -d '"')
- 
-          if [ -z "${VM_IP}" ] || [ "${VM_IP}" == "null" ]; then
-            echo "Error: no se pudo obtener la IP de PRE."
-            exit 1
-          fi
- 
-          echo "vm_ip=${VM_IP}" >> $GITHUB_OUTPUT
-          echo "IP PRE descubierta: ${VM_IP}"
+    - name: Obtener IP de VM PRE
+  id: tf_output
+  run: |
+    echo "=== Consultando workspace ==="
+    RESP_WS=$(curl -s \
+      --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+      --header "Content-Type: application/vnd.api+json" \
+      "https://app.terraform.io/api/v2/organizations/${{ vars.TF_ORGANIZATION }}/workspaces/Infraestructura_Pre")
+    echo "Respuesta workspace: ${RESP_WS}"
+
+    WORKSPACE_ID=$(echo "${RESP_WS}" | jq -r '.data.id')
+    echo "WORKSPACE_ID: ${WORKSPACE_ID}"
+
+    echo "=== Consultando outputs ==="
+    RESP_OUT=$(curl -s \
+      --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+      --header "Content-Type: application/vnd.api+json" \
+      "https://app.terraform.io/api/v2/workspaces/${WORKSPACE_ID}/current-state-version-outputs")
+    echo "Respuesta outputs: ${RESP_OUT}"
  
   # ─────────────────────────────────────────────
   # JOB 3: Despliegue a PRE
