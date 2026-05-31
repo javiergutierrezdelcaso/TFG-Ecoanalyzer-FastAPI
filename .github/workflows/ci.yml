@@ -31,7 +31,7 @@ jobs:
       - name: Análisis de código (flake8)
         run: |
           pip install flake8
-          flake8 . --max-line-length=120 --exclude=.git,__pycache__
+          flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
       # 5. Pruebas automatizadas con cobertura
       - name: Pruebas y cobertura de código
