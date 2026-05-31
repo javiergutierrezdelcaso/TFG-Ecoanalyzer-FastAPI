@@ -41,7 +41,7 @@ jobs:
 
       # 1. Autenticarse en Azure de forma segura
       - name: Login en Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS1 }}
 
@@ -144,7 +144,7 @@ jobs:
 
       # 1. Autenticarse en Azure para el entorno PRO
       - name: Login en Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS1 }}
 
