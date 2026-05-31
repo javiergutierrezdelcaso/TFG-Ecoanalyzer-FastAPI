@@ -1,10 +1,10 @@
 name: CD — Despliegue PRE y PRO
-
+ 
 on:
   push:
     branches:
       - main
-
+ 
 jobs:
   # ─────────────────────────────────────────────
   # JOB 1: Validaciones CI
@@ -27,57 +27,69 @@ jobs:
             --cov=main \
             --cov-report=term-missing \
             --cov-fail-under=80
-
+ 
   # ─────────────────────────────────────────────
-  # JOB 2: Despliegue a PRE
+  # JOB 2: Obtener IP de PRE desde Terraform Cloud
+  # ─────────────────────────────────────────────
+  obtener-ip-pre:
+    name: Obtener IP PRE desde Terraform Cloud
+    runs-on: ubuntu-latest
+    needs: validacion
+    outputs:
+      vm_ip: ${{ steps.tf_output.outputs.vm_ip }}
+    steps:
+      - name: Obtener IP de VM PRE
+        id: tf_output
+        run: |
+          WORKSPACE_ID=$(curl -s \
+            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/organizations/${{ vars.TF_ORGANIZATION }}/workspaces/Infraestructura_Pre" \
+            | jq -r '.data.id')
+ 
+          VM_IP=$(curl -s \
+            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/workspaces/${WORKSPACE_ID}/current-state-version-outputs" \
+            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value' \
+            | tr -d '"')
+ 
+          if [ -z "${VM_IP}" ] || [ "${VM_IP}" == "null" ]; then
+            echo "Error: no se pudo obtener la IP de PRE."
+            exit 1
+          fi
+ 
+          echo "vm_ip=${VM_IP}" >> $GITHUB_OUTPUT
+          echo "IP PRE descubierta: ${VM_IP}"
+ 
+  # ─────────────────────────────────────────────
+  # JOB 3: Despliegue a PRE
   # ─────────────────────────────────────────────
   despliegue-pre:
     name: Despliegue a PRE
     runs-on: ubuntu-latest
-    needs: validacion
+    needs: obtener-ip-pre
     environment: pre
     steps:
       - uses: actions/checkout@v4
-
-      # 1. Autenticarse en Azure de forma segura
-      - name: Login en Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS1 }}
-
-      # 2. Consultar la IP real directamente a Azure (Cambia el nombre de la VM y el Resource Group por los tuyos)
-      - name: Obtener IP de PRE desde Azure
-        id: get_ip
-        run: |
-          echo "Consultando la IP pública real en Azure..."
-          IP_PRE=$(az network public-ip show \
-            --resource-group rg-tfg-pre \
-            --name pip-tfg-pre \
-            --query ipAddress -o tsv)
-
-          if [ -z "$IP_PRE" ] || [ "$IP_PRE" == "null" ]; then
-            echo "❌ Error: Azure no ha asignado todavía una IP pública a este recurso."
-            exit 1
-          fi
-
-          echo "IP de PRE detectada en Azure: $IP_PRE"
-          echo "vm_ip=${IP_PRE}" >> $GITHUB_OUTPUT
-
+ 
       - name: Configurar clave SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa_tfg
           chmod 600 ~/.ssh/id_rsa_tfg
-          ssh-keyscan -H ${{ steps.get_ip.outputs.vm_ip }} >> ~/.ssh/known_hosts
-
+          ssh-keyscan -H ${{ needs.obtener-ip-pre.outputs.vm_ip }} \
+            >> ~/.ssh/known_hosts 2>/dev/null
+ 
       - name: Copiar código a PRE
         run: |
           scp -i ~/.ssh/id_rsa_tfg main.py requirements.txt \
-            azureuser@${{ steps.get_ip.outputs.vm_ip }}:/opt/microservicio/
-
+            azureuser@${{ needs.obtener-ip-pre.outputs.vm_ip }}:/opt/microservicio/
+ 
       - name: Reinstalar dependencias y reiniciar servicio en PRE
         run: |
-          ssh -i ~/.ssh/id_rsa_tfg azureuser@${{ vars.VM_IP_PRE }} \
+          ssh -i ~/.ssh/id_rsa_tfg \
+            azureuser@${{ needs.obtener-ip-pre.outputs.vm_ip }} \
             "sudo rm -rf /opt/microservicio/venv && \
              python3 -m venv /opt/microservicio/venv && \
              /opt/microservicio/venv/bin/pip install --upgrade pip && \
@@ -86,101 +98,112 @@ jobs:
              sudo systemctl restart microservicio && \
              sleep 3 && \
              sudo systemctl status microservicio --no-pager"
-
+ 
   # ─────────────────────────────────────────────
-  # JOB 3: Pruebas de integración en PRE
+  # JOB 4: Pruebas de integración en PRE
   # ─────────────────────────────────────────────
   pruebas-integracion:
     name: Pruebas de integración en PRE
     runs-on: ubuntu-latest
-    needs: despliegue-pre
+    needs: [despliegue-pre, obtener-ip-pre]
     environment: pre
     steps:
       - name: Esperar arranque del servicio
         run: sleep 10
-
+ 
       - name: Health check PRE
         run: |
           curl --fail --retry 5 --retry-delay 5 \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/health
-
+            http://${{ needs.obtener-ip-pre.outputs.vm_ip }}:8000/health
+ 
       - name: Verificar landing page PRE
         run: |
-          curl --fail http://${{ vars.VM_IP_PRE }}:8000/ \
+          curl --fail \
+            http://${{ needs.obtener-ip-pre.outputs.vm_ip }}:8000/ \
             | grep -i "EcoAnalyzer"
-
+ 
       - name: Verificar categorías
         run: |
-          curl --fail http://${{ vars.VM_IP_PRE }}:8000/categorias \
+          curl --fail \
+            http://${{ needs.obtener-ip-pre.outputs.vm_ip }}:8000/categorias \
             | grep -i "energia"
-
+ 
       - name: Crear análisis de prueba
         run: |
           curl --fail -X POST \
-            http://${{ vars.VM_IP_PRE }}:8000/analisis \
+            http://${{ needs.obtener-ip-pre.outputs.vm_ip }}:8000/analisis \
             -H "Content-Type: application/json" \
             -d '{"nombre":"test-ci","categoria":"energia","valor_co2_kg":45.5}'
-
-      - name: Listar análisis
-        run: |
-          curl --fail http://${{ vars.VM_IP_PRE }}:8000/analisis
-
+ 
       - name: Verificar estadísticas
         run: |
-          curl --fail http://${{ vars.VM_IP_PRE }}:8000/estadisticas \
+          curl --fail \
+            http://${{ needs.obtener-ip-pre.outputs.vm_ip }}:8000/estadisticas \
             | grep -i "total_analisis"
-
+ 
   # ─────────────────────────────────────────────
-  # JOB 4: Aprobación manual + Despliegue PRO
-  # Un solo entorno = una sola confirmación
+  # JOB 5: Obtener IP de PRO desde Terraform Cloud
+  # ─────────────────────────────────────────────
+  obtener-ip-pro:
+    name: Obtener IP PRO desde Terraform Cloud
+    runs-on: ubuntu-latest
+    needs: pruebas-integracion
+    outputs:
+      vm_ip: ${{ steps.tf_output.outputs.vm_ip }}
+    steps:
+      - name: Obtener IP de VM PRO
+        id: tf_output
+        run: |
+          WORKSPACE_ID=$(curl -s \
+            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/organizations/${{ vars.TF_ORGANIZATION }}/workspaces/Infraestructura_Pro" \
+            | jq -r '.data.id')
+ 
+          VM_IP=$(curl -s \
+            --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/workspaces/${WORKSPACE_ID}/current-state-version-outputs" \
+            | jq -r '.data[] | select(.attributes.name == "vm_public_ip") | .attributes.value' \
+            | tr -d '"')
+ 
+          if [ -z "${VM_IP}" ] || [ "${VM_IP}" == "null" ]; then
+            echo "Error: no se pudo obtener la IP de PRO."
+            exit 1
+          fi
+ 
+          echo "vm_ip=${VM_IP}" >> $GITHUB_OUTPUT
+          echo "IP PRO descubierta: ${VM_IP}"
+ 
+  # ─────────────────────────────────────────────
+  # JOB 6: Aprobación humana + Despliegue PRO
+  # Una sola confirmación gracias a environment: pro
   # ─────────────────────────────────────────────
   despliegue-pro:
     name: Aprobación y despliegue a PRO
     runs-on: ubuntu-latest
-    needs: pruebas-integracion
-    environment: pro   # ← Required reviewers aquí = 1 sola confirmación
+    needs: obtener-ip-pro
+    environment: pro
     steps:
       - uses: actions/checkout@v4
-
-      # 1. Autenticarse en Azure para el entorno PRO
-      - name: Login en Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS1 }}
-
-      # 2. Consultar la IP real de PRO directamente a Azure (Cambia los nombres por los tuyos de PRO)
-      - name: Obtener IP de PRO desde Azure
-        id: get_ip_pro
-        run: |
-          echo "Consultando la IP pública real de PRO en Azure..."
-          IP_PRO=$(az network public-ip show \
-            --resource-group rg-tfg-pro \
-            --name pip-tfg-pro \
-            --query ipAddress -o tsv)
-
-          if [ -z "$IP_PRO" ] || [ "$IP_PRO" == "null" ]; then
-            echo "❌ Error: Azure no ha asignado todavía una IP pública a PRO."
-            exit 1
-          fi
-
-          echo "IP de PRO detectada en Azure: $IP_PRO"
-          echo "vm_ip=${IP_PRO}" >> $GITHUB_OUTPUT
-
+ 
       - name: Configurar clave SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa_tfg
           chmod 600 ~/.ssh/id_rsa_tfg
-          ssh-keyscan -H ${{ steps.get_ip_pro.outputs.vm_ip }} >> ~/.ssh/known_hosts
-
+          ssh-keyscan -H ${{ needs.obtener-ip-pro.outputs.vm_ip }} \
+            >> ~/.ssh/known_hosts 2>/dev/null
+ 
       - name: Copiar código a PRO
         run: |
           scp -i ~/.ssh/id_rsa_tfg main.py requirements.txt \
-            azureuser@${{ steps.get_ip_pro.outputs.vm_ip }}:/opt/microservicio/
-
+            azureuser@${{ needs.obtener-ip-pro.outputs.vm_ip }}:/opt/microservicio/
+ 
       - name: Reinstalar dependencias y reiniciar servicio en PRO
         run: |
-          ssh -i ~/.ssh/id_rsa_tfg azureuser@${{ vars.VM_IP_PRO }} \
+          ssh -i ~/.ssh/id_rsa_tfg \
+            azureuser@${{ needs.obtener-ip-pro.outputs.vm_ip }} \
             "sudo rm -rf /opt/microservicio/venv && \
              python3 -m venv /opt/microservicio/venv && \
              /opt/microservicio/venv/bin/pip install --upgrade pip && \
@@ -189,13 +212,15 @@ jobs:
              sudo systemctl restart microservicio && \
              sleep 3 && \
              sudo systemctl status microservicio --no-pager"
-
+ 
       - name: Health check PRO
         run: |
           curl --fail --retry 5 --retry-delay 5 \
-            http://${{ vars.VM_IP_PRO }}:8000/health
-
+            http://${{ needs.obtener-ip-pro.outputs.vm_ip }}:8000/health
+ 
       - name: Verificar landing page PRO
         run: |
-          curl --fail http://${{ vars.VM_IP_PRO }}:8000/ \
+          curl --fail \
+            http://${{ needs.obtener-ip-pro.outputs.vm_ip }}:8000/ \
             | grep -i "EcoAnalyzer"
+ 
