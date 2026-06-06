@@ -8,17 +8,17 @@ mediante pipelines CI/CD con **GitHub Actions**.
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
-- 🌍 **Landing page visual** con métricas en tiempo real y badge de entorno (PRE/PRO)
-- 📊 **Gestión de análisis medioambientales** con cálculo automático del nivel de impacto
-- 📈 **Estadísticas agregadas** de CO₂ por categoría y nivel de impacto
-- 🏷️ **Categorías**: energía, transporte, residuos y agua
-- ❤️ **Health check** con información del entorno y versión
+- **Landing page visual** con métricas en tiempo real y badge de entorno (PRE/PRO)
+- **Gestión de análisis medioambientales** con cálculo automático del nivel de impacto
+- **Estadísticas agregadas** de CO₂ por categoría y nivel de impacto
+- **Categorías**: energía, transporte, residuos y agua
+- **Health check** con información del entorno y versión
 
 ---
 
-## 🚀 Endpoints
+## Endpoints
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -35,7 +35,7 @@ Documentación interactiva disponible en `/docs` (Swagger UI).
 
 ---
 
-## 📁 Estructura del repositorio
+## Estructura del repositorio
 
 ```
 microservicio/
@@ -53,7 +53,7 @@ microservicio/
 
 ---
 
-## 🔄 Pipelines CI/CD
+## Pipelines CI/CD
 
 ### CI — Validación de Pull Request (`ci.yml`)
 
@@ -92,7 +92,7 @@ push a main y automáticamente cada lunes. Los resultados aparecen en
 
 ---
 
-## 🧪 Pruebas
+## Pruebas
 
 57 pruebas organizadas en 5 clases cubriendo los tres niveles de la pirámide:
 
@@ -112,7 +112,7 @@ pytest test_main.py -v --cov=main --cov-report=term-missing
 
 ---
 
-## 🔐 Secretos y variables necesarios
+## Secretos y variables necesarios
 
 ### Repository secrets
 
@@ -138,7 +138,7 @@ humana antes del despliegue en producción.
 
 ---
 
-## 💻 Desarrollo local
+## Desarrollo local
 
 ### Requisitos
 - Python 3.10+
@@ -167,7 +167,7 @@ pytest test_main.py -v --cov=main --cov-report=term-missing
 
 ---
 
-## 🗂️ Modelo de datos
+## Modelo de datos
 
 ### Análisis (POST /analisis)
 
@@ -193,7 +193,7 @@ Categorías válidas: `energia`, `transporte`, `residuos`, `agua`
 
 ---
 
-## 📚 Referencias
+## Referencias
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
