@@ -33,7 +33,7 @@ jobs:
   # ─────────────────────────────────────────────
   # JOB 2: Despliegue a PRE
   # ─────────────────────────────────────────────
-  despliegue-pre:
+ despliegue-pre:
     name: Despliegue a PRE
     runs-on: ubuntu-latest
     needs: validacion
@@ -57,12 +57,10 @@ jobs:
             --show-details \
             --query publicIps \
             --output tsv)
-
           if [ -z "${VM_IP}" ]; then
             echo "Error: no se pudo obtener la IP de la VM PRE."
             exit 1
           fi
-
           echo "vm_ip=${VM_IP}" >> $GITHUB_OUTPUT
           echo "IP PRE: ${VM_IP}"
 
@@ -89,8 +87,10 @@ jobs:
              /opt/microservicio/venv/bin/pip install \
                -r /opt/microservicio/requirements.txt && \
              sudo systemctl restart microservicio && \
+             sudo systemctl restart nginx && \
              sleep 3 && \
-             sudo systemctl status microservicio --no-pager"
+             sudo systemctl status microservicio --no-pager && \
+             sudo systemctl status nginx --no-pager"
 
   # ─────────────────────────────────────────────
   # JOB 3: Pruebas de integración en PRE
@@ -159,12 +159,10 @@ jobs:
             --show-details \
             --query publicIps \
             --output tsv)
-
           if [ -z "${VM_IP}" ]; then
             echo "Error: no se pudo obtener la IP de la VM PRO."
             exit 1
           fi
-
           echo "vm_ip=${VM_IP}" >> $GITHUB_OUTPUT
           echo "IP PRO: ${VM_IP}"
 
@@ -191,16 +189,18 @@ jobs:
              /opt/microservicio/venv/bin/pip install \
                -r /opt/microservicio/requirements.txt && \
              sudo systemctl restart microservicio && \
+             sudo systemctl restart nginx && \
              sleep 3 && \
-             sudo systemctl status microservicio --no-pager"
+             sudo systemctl status microservicio --no-pager && \
+             sudo systemctl status nginx --no-pager"
 
-      - name: Health check PRO
+      - name: Health check Nginx PRO (puerto 80)
         run: |
           curl --fail --retry 5 --retry-delay 5 \
-            http://${{ steps.get_ip.outputs.vm_ip }}:8000/health
+            http://${{ steps.get_ip.outputs.vm_ip }}/health
 
       - name: Verificar landing page PRO
         run: |
           curl --fail \
-            http://${{ steps.get_ip.outputs.vm_ip }}:8000/ \
+            http://${{ steps.get_ip.outputs.vm_ip }}/ \
             | grep -i "EcoAnalyzer"
