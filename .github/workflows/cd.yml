@@ -106,31 +106,31 @@ jobs:
       - name: Health check PRE
         run: |
           curl --fail --retry 5 --retry-delay 5 \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/health
+            http://${{ needs.despliegue-pre.outputs.vm_ip }}health
 
       - name: Verificar landing page PRE
         run: |
           curl --fail \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/ \
+            http://${{ needs.despliegue-pre.outputs.vm_ip }} \
             | grep -i "EcoAnalyzer"
 
       - name: Verificar categorías
         run: |
           curl --fail \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/categorias \
+            http://${{ needs.despliegue-pre.outputs.vm_ip }}:categorias \
             | grep -i "energia"
 
       - name: Crear análisis de prueba
         run: |
           curl --fail -X POST \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/analisis \
+            http://${{ needs.despliegue-pre.outputs.vm_ip }}:analisis \
             -H "Content-Type: application/json" \
             -d '{"nombre":"test-ci","categoria":"energia","valor_co2_kg":45.5}'
 
       - name: Verificar estadísticas
         run: |
           curl --fail \
-            http://${{ needs.despliegue-pre.outputs.vm_ip }}:8000/estadisticas \
+            http://${{ needs.despliegue-pre.outputs.vm_ip }}:estadisticas \
             | grep -i "total_analisis"
 
   # ─────────────────────────────────────────────
