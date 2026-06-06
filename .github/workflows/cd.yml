@@ -33,7 +33,7 @@ jobs:
   # ─────────────────────────────────────────────
   # JOB 2: Despliegue a PRE
   # ─────────────────────────────────────────────
- despliegue-pre:
+  despliegue-pre:
     name: Despliegue a PRE
     runs-on: ubuntu-latest
     needs: validacion
