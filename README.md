@@ -80,21 +80,14 @@ conexión con Key Vault se ha establecido correctamente:
 
 La cadena de inyección es la siguiente:
 
-Terraform (output key_vault_uri)
-
-→ API Terraform Cloud
-
-→ Workflow Ansible (GitHub Actions)
-
-→ Servicio systemd (Environment=KEY_VAULT_URI=...)
-
-→ main.py (os.getenv("KEY_VAULT_URI"))
-
-→ Azure Key Vault SDK
-
-Ningún valor de Key Vault aparece en el repositorio ni en los logs 
-de los pipelines.
-
+```mermaid
+graph TD
+    A[Terraform: output key_vault_uri] --> B[API Terraform Cloud]
+    B --> C[Workflow Ansible: GitHub Actions]
+    C --> D[Servicio systemd: Environment=KEY_VAULT_URI=...]
+    D --> E[main.py: os.getenv]
+    E --> F[Azure Key Vault SDK]
+```
 ---
 
 ## Pipelines CI/CD
@@ -111,9 +104,8 @@ El merge queda **bloqueado** si alguna validación falla.
 
 Se dispara automáticamente al hacer merge a `main`.
 
-validacion → despliegue-pre → pruebas-integracion → despliegue-pro
+validacion → despliegue-pre → pruebas-integracion → despliegue-pro (aprobación humana)
 
-(aprobación humana)
 ### Estado y Ejecución de las Etapas del Pipeline
 
 | Tarea Operativa | Resultado | Descripción Técnica del Proceso |
