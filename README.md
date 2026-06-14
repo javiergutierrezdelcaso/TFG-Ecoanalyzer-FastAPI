@@ -1,9 +1,10 @@
 # 🌿 EcoAnalyzer — Microservicio
 
 Repositorio del microservicio **EcoAnalyzer**, desarrollado como Trabajo de Fin 
-de Grado en Ingeniería Informática. EcoAnalyzer es una API REST orientada al 
-análisis de huella de carbono y consumo energético, desarrollada con 
-**Python** y **FastAPI**, desplegada automáticamente en **Microsoft Azure** 
+de Grado en Ingeniería Informática. Esta herramienta, bautizada como EcoAnalyzer, 
+tiene como propósito evaluar el impacto energético y la huella de carbono. 
+Para su construcción, se ha seleccionado el lenguaje **Python** en combinación 
+con el framework **FastAPI**, desplegada automáticamente en **Microsoft Azure** 
 mediante pipelines CI/CD con **GitHub Actions**.
 
 ---
