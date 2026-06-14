@@ -75,12 +75,15 @@ validacion → despliegue-pre → pruebas-integracion → despliegue-pro
                                                      (aprobación humana)
 ```
 
-| Job | Descripción |
-|---|---|
-| `validacion` | Repite las validaciones de CI |
-| `despliegue-pre` | Obtiene IP de Azure, despliega en PRE via SSH |
-| `pruebas-integracion` | Health check, landing page, categorías, análisis, estadísticas |
-| `despliegue-pro` | Aprobación humana + despliegue en PRO + health check |
+### Estado y Ejecución de las Etapas del Pipeline
+
+| Tarea Operativa | Resultado | Descripción Técnica del Proceso |
+| :--- | :--- | :--- |
+| **Etapa de Inspección** | Exitoso | Análisis estático de código con *flake8*, ejecución de tests con *pytest* y reporte de cobertura. |
+| **Lanzamiento en Staging** | Exitoso | Transferencia por *SCP*, actualización del entorno virtual (*venv*) y reinicio del servicio vía *systemctl*. |
+| **Validación Funcional** | Exitoso | Verificación de *endpoints* críticos: estado del sistema, portada, catálogo, inserción de registros y métricas. |
+| **Control de Pase a producción** | Exitoso | Filtro de supervisión manual completado — Autorizado por el ingeniero de guardia: Javier. |
+| **Liberación Definitiva** | Exitoso | Confirmación de cambio único, despliegue automatizado y test de disponibilidad final en el entorno real (*PRO*). |
 
 La IP de las VMs se obtiene automáticamente desde **Azure CLI** 
 sin necesidad de configurar ninguna variable manual.
