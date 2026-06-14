@@ -95,7 +95,7 @@ push a main y automáticamente cada lunes. Los resultados aparecen en
 
 ## Pruebas
 
-57 pruebas organizadas en 5 clases cubriendo los tres niveles de la pirámide:
+La suite de calidad consta de 57 validaciones organizadas en 5 archivos de clases, las cuales abarcan las tres capas del modelo jerárquico de pruebas.
 
 | Clase | Tipo | Nº pruebas | Descripción |
 |---|---|---|---|
