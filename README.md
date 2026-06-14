@@ -43,27 +43,16 @@ Documentación interactiva disponible en `/docs` (Swagger UI).
 ## Estructura del repositorio
 
 microservicio/
-
-├── main.py                         # Aplicación FastAPI — EcoAnalyzer
-
-├── requirements.txt                # Dependencias Python
-
-├── test_main.py                    # 57 pruebas automatizadas (pytest)
-
+├── main.py                 # Aplicación FastAPI — EcoAnalyzer
+├── requirements.txt        # Dependencias Python
+├── test_main.py            # 57 pruebas automatizadas (pytest)
 ├── .gitignore
-
 └── .github/
-
-├── dependabot.yml              # Actualización automática de dependencias
-
-└── workflows/
-
-├── ci.yml                  # Pipeline CI — validación en PRs
-
-├── cd.yml                  # Pipeline CD — despliegue PRE y PRO
-
-└── codeql.yml              # Análisis de seguridad CodeQL
-
+    ├── dependabot.yml      # Actualización automática de dependencias
+    └── workflows/
+        ├── ci.yml          # Pipeline CI — validación en PRs
+        ├── cd.yml          # Pipeline CD — despliegue PRE y PRO
+        └── codeql.yml      # Análisis de seguridad CodeQL
 ---
 
 ## Integración con Azure Key Vault
