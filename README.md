@@ -19,18 +19,18 @@ mediante pipelines CI/CD con **GitHub Actions**.
 
 ---
 
-## Endpoints
+### Especificación de Endpoints de la API
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/` | Landing page visual HTML |
-| `GET` | `/health` | Health check con entorno y timestamp |
-| `GET` | `/categorias` | Listar categorías disponibles |
-| `GET` | `/analisis` | Listar todos los análisis |
-| `GET` | `/analisis/{id}` | Obtener análisis por ID |
-| `POST` | `/analisis` | Crear nuevo análisis |
-| `DELETE` | `/analisis/{id}` | Eliminar análisis por ID |
-| `GET` | `/estadisticas` | Estadísticas agregadas de CO₂ |
+| Verbo HTTP | Dirección del Recurso | Propósito y Respuesta del Servicio |
+| :--- | :--- | :--- |
+| **GET** | `/` | Renderizado de la interfaz gráfica principal (Página de inicio en HTML). |
+| **GET** | `/health` | Diagnóstico del estado del sistema, incluyendo variables de entorno y marca de tiempo (*timestamp*). |
+| **GET** | `/categorias` | Consulta del catálogo completo de clasificaciones disponibles en la plataforma. |
+| **GET** | `/analisis` | Recuperación del histórico global de registros evaluados. |
+| **GET** | `/analisis/{id}` | Extracción de un reporte específico utilizando su identificador único. |
+| **GET** | `/estadisticas` | Cálculo de métricas consolidadas y datos acumulados sobre emisiones de CO₂. |
+| **POST** | `/analisis` | Procesamiento e inserción de un nuevo estudio o registro en el sistema. |
+| **DELETE** | `/analisis/{id}` | Remoción o purga de un registro específico de la base de datos mediante su ID. |
 
 Documentación interactiva disponible en `/docs` (Swagger UI).
 
