@@ -19,7 +19,7 @@ jobs:
 
     steps:
       # v4 es la versión oficial y estable
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -158,7 +158,7 @@ jobs:
     needs: pruebas-integracion
     environment: pro
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Login en Azure CLI
         uses: azure/login@v2
