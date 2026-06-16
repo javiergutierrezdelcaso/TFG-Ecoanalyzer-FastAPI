@@ -17,7 +17,7 @@ jobs:
     steps:
       # 1. Checkout del código
       - name: Checkout código
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       # 2. Configurar Python (Sin caché por el error 400)
       - name: Configurar Python 3.11
