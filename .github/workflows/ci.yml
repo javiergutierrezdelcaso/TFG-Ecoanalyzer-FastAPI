@@ -18,7 +18,7 @@ jobs:
     steps:
       # 1. Checkout del código de la PR (v4 es la versión estable actual)
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. Configurar Python
       - name: Configurar Python 3.11
@@ -51,7 +51,7 @@ jobs:
       # 6. Guardar el resultado de cobertura como artefacto sin fallos de Node
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report
           path: .coverage
