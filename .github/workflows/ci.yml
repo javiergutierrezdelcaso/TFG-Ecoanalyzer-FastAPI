@@ -22,7 +22,7 @@ jobs:
 
       # 2. Configurar Python (Sin caché por el error 400)
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.2.0
         with:
           python-version: "3.11"
 
@@ -46,7 +46,7 @@ jobs:
       # 6. Guardar el artefacto de cobertura (Ahora buscará 'coverage.xml')
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0 
         with:
           name: coverage-report
           path: coverage.xml
