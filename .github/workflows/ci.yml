@@ -33,11 +33,11 @@ jobs:
           pip install flake8
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      # 5. Pruebas automatizadas con cobertura (Corregido con python -m para evitar problemas de importación)
+      # 5. Pruebas automatizadas con cobertura
       - name: Pruebas y cobertura de código
         run: |
-          python -m pytest test_main.py -v \
-            --cov=main \
+          python -m pytest **/test_main.py -v \
+            --cov=. \
             --cov-report=term-missing \
             --cov-fail-under=80
 
