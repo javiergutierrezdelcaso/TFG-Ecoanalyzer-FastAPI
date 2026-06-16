@@ -9,6 +9,7 @@ on:
 # Forzamos el uso de Node 24 de manera limpia en todo el workflow.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true  # Opción adicional si es necesario
 
 jobs:
   ci:
@@ -21,7 +22,7 @@ jobs:
 
       # 2. Configurar Python (Sin caché por el error 400)
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5.2.0
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -45,7 +46,7 @@ jobs:
       # 6. Guardar el artefacto de cobertura (Ahora buscará 'coverage.xml')
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
