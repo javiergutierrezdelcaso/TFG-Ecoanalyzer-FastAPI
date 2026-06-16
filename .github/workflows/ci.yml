@@ -37,7 +37,7 @@ jobs:
       - name: Pruebas y cobertura de código
         run: |
           python -m pytest test_main.py -v \
-            --cov=main \
+            --cov=. \
             --cov-report=term-missing \
             --cov-fail-under=80
 
