@@ -12,23 +12,36 @@ jobs:
   validacion:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
+    
+    # 💡 SOLUCIÓN: Quitamos la variable conflictiva. Solo forzamos Node 24.
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
     steps:
-      - uses: actions/checkout@v5
+      # v4 es la versión oficial y estable
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-      - run: pip install -r requirements.txt
-      - run: |
-          pip install flake8
-          flake8 . --max-line-length=120 \
-                   --exclude=.git,__pycache__,test_main.py
-      - run: |
+
+      # Instalamos las herramientas de test necesarias para que la cobertura funcione
+      - name: Instalar dependencias y herramientas
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8 fastapi httpx
+
+      - name: Análisis de código (flake8)
+        run: |
+          flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
+
+      # Ajustamos el parámetro --cov=. para asegurar el reporte en la raíz
+      - name: Ejecutar pruebas y cobertura
+        run: |
           pytest test_main.py -v \
-            --cov=main \
+            --cov=. \
             --cov-report=term-missing \
             --cov-fail-under=80
 
