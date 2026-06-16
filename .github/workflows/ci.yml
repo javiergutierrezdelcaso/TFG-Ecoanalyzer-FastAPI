@@ -5,28 +5,25 @@ on:
     branches:
       - main
 
-# 💡 SOLUCIÓN DEFINITIVA AL WARNING: Al ponerlo aquí arriba a nivel global,
-# obligamos a GitHub a procesar todo bajo Node 24 y deja de escupir el texto largo.
+# 💡 SOLUCIÓN CORRECTA PARA NODE 24:
+# Forzamos el uso de Node 24 de manera limpia en todo el workflow.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       # 1. Checkout del código
       - name: Checkout código
         uses: actions/checkout@v5
 
-      # 2. Configurar Python (SIN CACHÉ para evitar el error de los servidores de GitHub)
+      # 2. Configurar Python (Sin caché por el error 400)
       - name: Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          # 💡 SOLUCIÓN AL ERROR 400: Eliminamos la línea de cache: "pip" 
-          # Así descarga de cero y no depende del servicio que está caído hoy.
 
       # 3. Instalar dependencias completas + sistema de cobertura
       - name: Instalar dependencias
@@ -40,15 +37,15 @@ jobs:
         run: |
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      # 5. Forzamos a Python a escribir el reporte en un archivo plano (.coverage)
+      # 5. Pruebas y generación de reporte de cobertura (Cambiado a formato XML para asegurar el archivo)
       - name: Pruebas y cobertura de código
         run: |
-          python -m pytest test_main.py -v --cov=. --cov-report=term-missing
+          python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura si todo ha ido bien
+      # 6. Guardar el artefacto de cobertura (Ahora buscará 'coverage.xml')
       - name: Publicar cobertura en PR
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: .coverage
+          path: coverage.xml
