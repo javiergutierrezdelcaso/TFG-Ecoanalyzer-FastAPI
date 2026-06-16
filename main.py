@@ -31,6 +31,7 @@ if KEY_VAULT_URI:
 # Modelos
 # ─────────────────────────────────────────────
 
+
 class Analisis(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
     categoria: str = Field(
