@@ -85,18 +85,14 @@ class TestHealthYLanding:
     def test_health_contiene_campos_requeridos(self):
         response = client.get("/health")
         data = response.json()
-        assert "servicio" in data
+        assert "status" in data
         assert "entorno" in data
-        assert "version" in data
+        assert "kv_conectado" in data
         assert "timestamp" in data
 
-    def test_health_servicio_es_ecoanalyzer(self):
+    def test_health_status_es_ok(self):
         response = client.get("/health")
-        assert response.json()["servicio"] == "ecoanalyzer"
-
-    def test_health_version_correcta(self):
-        response = client.get("/health")
-        assert response.json()["version"] == "1.0.0"
+        assert response.json()["status"] == "ok"
 
 
 # ═══════════════════════════════════════════════════════════
