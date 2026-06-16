@@ -7,18 +7,18 @@ on:
 
 # 💡 SOLUCIÓN DEFINITIVA AL WARNING: Al ponerlo aquí arriba a nivel global,
 # obligamos a GitHub a procesar todo bajo Node 24 y deja de escupir el texto largo.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
-
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       # 1. Checkout del código
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. Configurar Python (SIN CACHÉ para evitar el error de los servidores de GitHub)
       - name: Configurar Python 3.11
