@@ -9,7 +9,6 @@ on:
 # Forzamos el uso de Node 24 de manera limpia en todo el workflow.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true  # Opción adicional si es necesario
 
 jobs:
   ci:
