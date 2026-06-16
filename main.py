@@ -8,10 +8,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-KEY_VAULT_URI = os.getenv("KEY_VAULT_URI", "")
-APP_SECRET = "no-configurado"
-
-
 app = FastAPI(
     title="EcoAnalyzer API",
     description="Servicio de análisis de huella de carbono y consumo energético",
@@ -21,6 +17,8 @@ app = FastAPI(
 ENTORNO = os.getenv("ENTORNO", "PRE")
 KEY_VAULT_URI = os.getenv("KEY_VAULT_URI", "")
 APP_SECRET = "no-configurado"
+
+# Inicialización segura de Azure Key Vault (no bloquea el entorno de pruebas)
 if KEY_VAULT_URI:
     try:
         credential = DefaultAzureCredential()
@@ -32,7 +30,6 @@ if KEY_VAULT_URI:
 # ─────────────────────────────────────────────
 # Modelos
 # ─────────────────────────────────────────────
-
 
 class Analisis(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
