@@ -1,6 +1,5 @@
 name: CI — Validación de Pull Request
 
-# Se dispara en cada Pull Request hacia main
 on:
   pull_request:
     branches:
@@ -11,36 +10,31 @@ jobs:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     
-    # 💡 SOLUCIÓN: Eliminada la variable conflictiva. Solo forzamos Node 24.
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
-      # 1. Checkout del código de la PR (v4 es la versión estable actual)
       - name: Checkout código
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      # 2. Configurar Python
       - name: Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # 3. Instalar dependencias (añadiendo explícitamente herramientas de test)
+      # 💡 SOLUCIÓN: Instalamos pytest-cov aquí para que el comando de abajo funcione
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov flake8 fastapi httpx
 
-      # 4. Análisis de código con flake8 (calidad y estilo)
       - name: Análisis de código (flake8)
         run: |
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      # 5. Pruebas automatizadas con cobertura
-      # El flag --cov=. fuerza la creación física del archivo .coverage en la raíz
+      # El flag --cov=. generará el archivo .coverage obligatoriamente en la raíz
       - name: Pruebas y cobertura de código
         run: |
           python -m pytest test_main.py -v \
@@ -48,10 +42,9 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=80
 
-      # 6. Guardar el resultado de cobertura como artefacto sin fallos de Node
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: .coverage
