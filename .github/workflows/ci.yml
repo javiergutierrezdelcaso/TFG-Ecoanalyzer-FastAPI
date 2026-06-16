@@ -38,8 +38,8 @@ jobs:
       # 5. Pruebas automatizadas con cobertura
       - name: Pruebas y cobertura de código
         run: |
-          pytest test_main.py -v \
-            --cov=main \
+          python -m pytest test_main.py -v \
+            --cov=. \
             --cov-report=term-missing \
             --cov-fail-under=80
 
