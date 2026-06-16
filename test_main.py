@@ -195,23 +195,156 @@ class TestAnalisisCRUD:
             "valor_co2_kg": 3.0,
             "descripcion": "Descripción detallada"
         }
+        data = client.post("/analisis", json=payload).json()
+        assert data["descripcion"] == "Descripción detallada"
 
-    valores = [a.valor_co2_kg for a in analisis_db.values()]
-    por_categoria: dict = {}
-    por_nivel: dict = {}
+    def test_crear_analisis_categoria_invalida(self):
+        payload = {
+            "nombre": "Test inválido",
+            "categoria": "nuclear",
+            "valor_co2_kg": 10.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
 
-    for a in analisis_db.values():
-        por_categoria[a.categoria] = (
-            por_categoria.get(a.categoria, 0) + a.valor_co2_kg
-        )
-        por_nivel[a.nivel_impacto] = por_nivel.get(a.nivel_impacto, 0) + 1
+    def test_crear_analisis_co2_negativo(self):
+        payload = {
+            "nombre": "Test negativo",
+            "categoria": "energia",
+            "valor_co2_kg": -5.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
 
-    return {
-        "total_analisis": len(analisis_db),
-        "co2_total_kg": round(sum(valores), 2),
-        "co2_promedio_kg": round(sum(valores) / len(valores), 2),
-        "co2_maximo_kg": round(max(valores), 2),
-        "co2_minimo_kg": round(min(valores), 2),
-        "por_categoria": {k: round(v, 2) for k, v in por_categoria.items()},
-        "por_nivel_impacto": por_nivel,
-    }
+    def test_crear_analisis_co2_cero(self):
+        payload = {
+            "nombre": "Test cero",
+            "categoria": "energia",
+            "valor_co2_kg": 0.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_crear_analisis_nombre_vacio(self):
+        payload = {
+            "nombre": "",
+            "categoria": "energia",
+            "valor_co2_kg": 10.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_obtener_analisis_existente(self):
+        payload = {
+            "nombre": "Test obtener",
+            "categoria": "transporte",
+            "valor_co2_kg": 20.0
+        }
+        creado = client.post("/analisis", json=payload).json()
+        response = client.get(f"/analisis/{creado['id']}")
+        assert response.status_code == 200
+        assert response.json()["id"] == creado["id"]
+
+    def test_obtener_analisis_no_existente(self):
+        response = client.get("/analisis/99999")
+        assert response.status_code == 404
+
+    def test_listar_analisis_tras_crear(self):
+        for i in range(3):
+            client.post("/analisis", json={
+                "nombre": f"Análisis {i}",
+                "categoria": "energia",
+                "valor_co2_kg": float(i + 1)
+            })
+        response = client.get("/analisis")
+        assert len(response.json()) == 3
+
+    def test_eliminar_analisis_existente(self):
+        creado = client.post("/analisis", json={
+            "nombre": "Borrar",
+            "categoria": "agua",
+            "valor_co2_kg": 1.0
+        }).json()
+        response = client.delete(f"/analisis/{creado['id']}")
+        assert response.status_code == 200
+
+    def test_eliminar_analisis_no_aparece_despues(self):
+        creado = client.post("/analisis", json={
+            "nombre": "Borrar check",
+            "categoria": "agua",
+            "valor_co2_kg": 1.0
+        }).json()
+        client.delete(f"/analisis/{creado['id']}")
+        assert client.get(f"/analisis/{creado['id']}").status_code == 404
+
+    def test_eliminar_analisis_no_existente(self):
+        response = client.delete("/analisis/99999")
+        assert response.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS DE INTEGRACIÓN — Estadísticas
+# ═══════════════════════════════════════════════════════════
+
+class TestEstadisticas:
+
+    def setup_method(self):
+        analisis_db.clear()
+
+    def test_estadisticas_sin_datos(self):
+        response = client.get("/estadisticas")
+        assert response.status_code == 200
+        assert response.json()["total_analisis"] == 0
+
+    def test_estadisticas_co2_total(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 10.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "transporte", "valor_co2_kg": 20.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_total_kg"] == 30.0
+
+    def test_estadisticas_promedio(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 10.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "energia", "valor_co2_kg": 30.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_promedio_kg"] == 20.0
+
+    def test_estadisticas_maximo_minimo(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "agua", "valor_co2_kg": 5.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "agua", "valor_co2_kg": 100.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_maximo_kg"] == 100.0
+        assert data["co2_minimo_kg"] == 5.0
+
+    def test_estadisticas_por_categoria(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 15.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "transporte", "valor_co2_kg": 25.0})
+        data = client.get("/estadisticas").json()
+        assert "energia" in data["por_categoria"]
+        assert "transporte" in data["por_categoria"]
+
+    def test_estadisticas_por_nivel_impacto(self):
+        client.post("/analisis", json={
+            "nombre": "Bajo", "categoria": "agua", "valor_co2_kg": 5.0})
+        client.post("/analisis", json={
+            "nombre": "Critico", "categoria": "energia", "valor_co2_kg": 300.0})
+        data = client.get("/estadisticas").json()
+        assert "bajo" in data["por_nivel_impacto"]
+        assert "critico" in data["por_nivel_impacto"]
+
+    def test_estadisticas_total_analisis(self):
+        for i in range(5):
+            client.post("/analisis", json={
+                "nombre": f"Test {i}",
+                "categoria": "residuos",
+                "valor_co2_kg": float(i + 1)
+            })
+        data = client.get("/estadisticas").json()
+        assert data["total_analisis"] == 5
