@@ -4,3 +4,5 @@ pydantic
 httpx
 pytest
 pytest-cov
+azure-identity
+azure-keyvault-secrets

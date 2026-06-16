@@ -1,372 +1,350 @@
-import datetime
-import os
-from typing import Optional
+import pytest  # noqa: F401
+from fastapi.testclient import TestClient
+from main import app, analisis_db, calcular_nivel_impacto
 
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
-
-KEY_VAULT_URI = os.getenv("KEY_VAULT_URI", "")
-APP_SECRET = "no-configurado"
+client = TestClient(app)
 
 
-app = FastAPI(
-    title="EcoAnalyzer API",
-    description="Servicio de análisis de huella de carbono y consumo energético",
-    version="1.0.0",
-)
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS UNITARIAS
+# Validan funciones y lógica interna de forma aislada
+# ═══════════════════════════════════════════════════════════
 
-ENTORNO = os.getenv("ENTORNO", "PRE")
-KEY_VAULT_URI = os.getenv("KEY_VAULT_URI", "")
-APP_SECRET = "no-configurado"
-if KEY_VAULT_URI:
-    try:
-        credential = DefaultAzureCredential()
-        client = SecretClient(vault_url=KEY_VAULT_URI, credential=credential)
-        APP_SECRET = client.get_secret("eco-api-secret").value
-    except Exception as e:
-        APP_SECRET = f"error-al-leer-kv: {e}"
+class TestCalcularNivelImpacto:
+    """Pruebas unitarias de la función calcular_nivel_impacto"""
 
-# ─────────────────────────────────────────────
-# Modelos
-# ─────────────────────────────────────────────
+    def test_nivel_bajo(self):
+        assert calcular_nivel_impacto(5.0) == "bajo"
 
+    def test_nivel_bajo_limite(self):
+        assert calcular_nivel_impacto(9.99) == "bajo"
 
-class Analisis(BaseModel):
-    nombre: str = Field(..., min_length=1, max_length=100)
-    categoria: str = Field(
-        ..., description="energia | transporte | residuos | agua"
-    )
-    valor_co2_kg: float = Field(..., gt=0)
-    descripcion: Optional[str] = None
+    def test_nivel_medio(self):
+        assert calcular_nivel_impacto(25.0) == "medio"
 
+    def test_nivel_medio_limite_inferior(self):
+        assert calcular_nivel_impacto(10.0) == "medio"
 
-class AnalisisResponse(BaseModel):
-    id: int
-    nombre: str
-    categoria: str
-    valor_co2_kg: float
-    descripcion: Optional[str]
-    nivel_impacto: str
-    creado_en: str
+    def test_nivel_medio_limite_superior(self):
+        assert calcular_nivel_impacto(49.99) == "medio"
 
+    def test_nivel_alto(self):
+        assert calcular_nivel_impacto(100.0) == "alto"
 
-CATEGORIAS_VALIDAS = {"energia", "transporte", "residuos", "agua"}
+    def test_nivel_alto_limite_inferior(self):
+        assert calcular_nivel_impacto(50.0) == "alto"
 
-analisis_db: dict[int, AnalisisResponse] = {}
-contador_id = 1
+    def test_nivel_alto_limite_superior(self):
+        assert calcular_nivel_impacto(199.99) == "alto"
+
+    def test_nivel_critico(self):
+        assert calcular_nivel_impacto(500.0) == "critico"
+
+    def test_nivel_critico_limite(self):
+        assert calcular_nivel_impacto(200.0) == "critico"
+
+    def test_valor_muy_pequeno(self):
+        assert calcular_nivel_impacto(0.01) == "bajo"
+
+    def test_valor_muy_grande(self):
+        assert calcular_nivel_impacto(99999.0) == "critico"
 
 
-def calcular_nivel_impacto(co2_kg: float) -> str:
-    if co2_kg < 10:
-        return "bajo"
-    elif co2_kg < 50:
-        return "medio"
-    elif co2_kg < 200:
-        return "alto"
-    else:
-        return "critico"
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS DE INTEGRACIÓN — Health y Landing
+# Verifican endpoints de estado del servicio
+# ═══════════════════════════════════════════════════════════
+
+class TestHealthYLanding:
+
+    def test_landing_devuelve_html(self):
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_landing_contiene_nombre_servicio(self):
+        response = client.get("/")
+        assert "EcoAnalyzer" in response.text
+
+    def test_landing_contiene_entorno(self):
+        response = client.get("/")
+        assert "ENTORNO" in response.text
+
+    def test_landing_contiene_links_api(self):
+        response = client.get("/")
+        assert "/docs" in response.text
+        assert "/health" in response.text
+        assert "/analisis" in response.text
+
+    def test_health_devuelve_ok(self):
+        response = client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+
+    def test_health_contiene_campos_requeridos(self):
+        response = client.get("/health")
+        data = response.json()
+        assert "status" in data
+        assert "entorno" in data
+        assert "kv_conectado" in data
+        assert "timestamp" in data
+
+    def test_health_status_es_ok(self):
+        response = client.get("/health")
+        assert response.json()["status"] == "ok"
 
 
-# ─────────────────────────────────────────────
-# Landing page visual
-# ─────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse, tags=["Info"])
-def landing():
-    total = len(analisis_db)
-    co2_total = sum(a.valor_co2_kg for a in analisis_db.values())
-    ahora = datetime.datetime.utcnow().strftime("%d/%m/%Y %H:%M:%S UTC")
-    color_entorno = "#2ecc71" if ENTORNO == "PRO" else "#f39c12"
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS DE INTEGRACIÓN — Categorías
+# ═══════════════════════════════════════════════════════════
 
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>EcoAnalyzer</title>
-        <style>
-            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{
-                font-family: 'Segoe UI', sans-serif;
-                background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-            }}
-            .container {{
-                text-align: center;
-                padding: 2rem;
-                max-width: 800px;
-            }}
-            .logo {{ font-size: 5rem; margin-bottom: 0.5rem; }}
-            h1 {{
-                font-size: 3rem;
-                font-weight: 700;
-                background: linear-gradient(90deg, #2ecc71, #1abc9c);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                margin-bottom: 0.5rem;
-            }}
-            .tagline {{
-                font-size: 1.1rem;
-                color: #a0b4c0;
-                margin-bottom: 2rem;
-            }}
-            .badge-entorno {{
-                display: inline-block;
-                background: {color_entorno};
-                color: white;
-                padding: 0.3rem 1rem;
-                border-radius: 999px;
-                font-weight: 600;
-                font-size: 0.9rem;
-                margin-bottom: 2rem;
-                letter-spacing: 1px;
-            }}
-            .status {{
-                display: inline-flex;
-                align-items: center;
-                gap: 0.5rem;
-                background: rgba(46,204,113,0.15);
-                border: 1px solid #2ecc71;
-                border-radius: 999px;
-                padding: 0.4rem 1.2rem;
-                font-size: 0.95rem;
-                margin-bottom: 2.5rem;
-            }}
-            .dot {{
-                width: 10px; height: 10px;
-                background: #2ecc71;
-                border-radius: 50%;
-                animation: pulse 1.5s infinite;
-            }}
-            @keyframes pulse {{
-                0%, 100% {{ opacity: 1; }}
-                50% {{ opacity: 0.3; }}
-            }}
-            .cards {{
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 1rem;
-                margin-bottom: 2rem;
-            }}
-            .card {{
-                background: rgba(255,255,255,0.07);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 12px;
-                padding: 1.2rem;
-            }}
-            .card-value {{
-                font-size: 2rem;
-                font-weight: 700;
-                color: #2ecc71;
-            }}
-            .card-label {{
-                font-size: 0.8rem;
-                color: #a0b4c0;
-                margin-top: 0.2rem;
-            }}
-            .links {{
-                display: flex;
-                gap: 1rem;
-                justify-content: center;
-                flex-wrap: wrap;
-            }}
-            .link-btn {{
-                background: rgba(255,255,255,0.1);
-                border: 1px solid rgba(255,255,255,0.2);
-                color: white;
-                padding: 0.6rem 1.4rem;
-                border-radius: 8px;
-                text-decoration: none;
-                font-size: 0.9rem;
-                transition: background 0.2s;
-            }}
-            .link-btn:hover {{ background: rgba(255,255,255,0.2); }}
-            .footer {{
-                margin-top: 2.5rem;
-                font-size: 0.75rem;
-                color: #5a7080;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="logo">🌿</div>
-            <h1>EcoAnalyzer</h1>
-            <p class="tagline">
-                Análisis de huella de carbono y consumo energético
-            </p>
-            <div class="badge-entorno">ENTORNO: {ENTORNO}</div>
-            <br>
-            <div class="status">
-                <div class="dot"></div>
-                Servicio operativo
-            </div>
-            <div class="cards">
-                <div class="card">
-                    <div class="card-value">{total}</div>
-                    <div class="card-label">Análisis registrados</div>
-                </div>
-                <div class="card">
-                    <div class="card-value">{co2_total:.1f}</div>
-                    <div class="card-label">kg CO₂ analizados</div>
-                </div>
-                <div class="card">
-                    <div class="card-value">v1.0</div>
-                    <div class="card-label">Versión del servicio</div>
-                </div>
-            </div>
-            <div class="links">
-                <a class="link-btn" href="/docs">📖 Documentación API</a>
-                <a class="link-btn" href="/health">❤️ Health Check</a>
-                <a class="link-btn" href="/analisis">📊 Análisis</a>
-                <a class="link-btn" href="/estadisticas">📈 Estadísticas</a>
-                <a class="link-btn" href="/categorias">🏷️ Categorías</a>
-            </div>
-            <div class="footer">
-                Última comprobación: {ahora} ·
-                TFG — Automatización de Despliegue con GitHub Actions y Terraform
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html)
+class TestCategorias:
+
+    def test_listar_categorias_devuelve_200(self):
+        response = client.get("/categorias")
+        assert response.status_code == 200
+
+    def test_listar_categorias_contiene_cuatro(self):
+        response = client.get("/categorias")
+        assert len(response.json()["categorias"]) == 4
+
+    def test_categorias_contiene_energia(self):
+        response = client.get("/categorias")
+        ids = [c["id"] for c in response.json()["categorias"]]
+        assert "energia" in ids
+
+    def test_categorias_contiene_transporte(self):
+        response = client.get("/categorias")
+        ids = [c["id"] for c in response.json()["categorias"]]
+        assert "transporte" in ids
+
+    def test_categorias_contiene_residuos(self):
+        response = client.get("/categorias")
+        ids = [c["id"] for c in response.json()["categorias"]]
+        assert "residuos" in ids
+
+    def test_categorias_contiene_agua(self):
+        response = client.get("/categorias")
+        ids = [c["id"] for c in response.json()["categorias"]]
+        assert "agua" in ids
+
+    def test_categorias_tienen_descripcion(self):
+        response = client.get("/categorias")
+        for cat in response.json()["categorias"]:
+            assert "descripcion" in cat
+            assert len(cat["descripcion"]) > 0
 
 
-# ─────────────────────────────────────────────
-# Health check
-# ─────────────────────────────────────────────
-@app.get("/health", tags=["Health"])
-def health():
-    return {
-        "status": "ok",
-        "servicio": "ecoanalyzer",
-        "version": "1.0.0",
-        "entorno": ENTORNO,
-        "kv_conectado": KEY_VAULT_URI != "",
-        "timestamp": datetime.datetime.utcnow().isoformat(),
-    }
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS DE INTEGRACIÓN — CRUD Análisis
+# ═══════════════════════════════════════════════════════════
 
+class TestAnalisisCRUD:
 
-# ─────────────────────────────────────────────
-# Categorías
-# ─────────────────────────────────────────────
-@app.get("/categorias", tags=["Categorías"])
-def listar_categorias():
-    return {
-        "categorias": [
-            {
-                "id": "energia",
-                "nombre": "Energía",
-                "descripcion": "Consumo eléctrico y combustibles",
-            },
-            {
-                "id": "transporte",
-                "nombre": "Transporte",
-                "descripcion": "Emisiones por desplazamiento",
-            },
-            {
-                "id": "residuos",
-                "nombre": "Residuos",
-                "descripcion": "Generación y gestión de residuos",
-            },
-            {
-                "id": "agua",
-                "nombre": "Agua",
-                "descripcion": "Consumo y tratamiento de agua",
-            },
-        ]
-    }
+    def setup_method(self):
+        """Limpiar la base de datos antes de cada test"""
+        analisis_db.clear()
 
+    def test_listar_analisis_vacio(self):
+        response = client.get("/analisis")
+        assert response.status_code == 200
+        assert response.json() == []
 
-# ─────────────────────────────────────────────
-# CRUD Análisis
-# ─────────────────────────────────────────────
-@app.get("/analisis", tags=["Análisis"])
-def listar_analisis():
-    return list(analisis_db.values())
-
-
-@app.get("/analisis/{analisis_id}", tags=["Análisis"])
-def obtener_analisis(analisis_id: int):
-    if analisis_id not in analisis_db:
-        raise HTTPException(
-            status_code=404, detail=f"Análisis {analisis_id} no encontrado"
-        )
-    return analisis_db[analisis_id]
-
-
-@app.post("/analisis", status_code=201, tags=["Análisis"])
-def crear_analisis(analisis: Analisis):
-    global contador_id
-    if analisis.categoria not in CATEGORIAS_VALIDAS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Categoría inválida. Válidas: {CATEGORIAS_VALIDAS}",
-        )
-    nuevo = AnalisisResponse(
-        id=contador_id,
-        nombre=analisis.nombre,
-        categoria=analisis.categoria,
-        valor_co2_kg=analisis.valor_co2_kg,
-        descripcion=analisis.descripcion,
-        nivel_impacto=calcular_nivel_impacto(analisis.valor_co2_kg),
-        creado_en=datetime.datetime.utcnow().isoformat(),
-    )
-    analisis_db[contador_id] = nuevo
-    contador_id += 1
-    return nuevo
-
-
-@app.delete("/analisis/{analisis_id}", tags=["Análisis"])
-def eliminar_analisis(analisis_id: int):
-    if analisis_id not in analisis_db:
-        raise HTTPException(
-            status_code=404, detail=f"Análisis {analisis_id} no encontrado"
-        )
-    del analisis_db[analisis_id]
-    return {"mensaje": f"Análisis {analisis_id} eliminado correctamente"}
-
-
-# ─────────────────────────────────────────────
-# Estadísticas
-# ─────────────────────────────────────────────
-@app.get("/estadisticas", tags=["Estadísticas"])
-def obtener_estadisticas():
-    if not analisis_db:
-        return {
-            "total_analisis": 0,
-            "co2_total_kg": 0,
-            "co2_promedio_kg": 0,
-            "co2_maximo_kg": 0,
-            "co2_minimo_kg": 0,
-            "por_categoria": {},
-            "por_nivel_impacto": {},
+    def test_crear_analisis_exitoso(self):
+        payload = {
+            "nombre": "Consumo oficina",
+            "categoria": "energia",
+            "valor_co2_kg": 45.5
         }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 201
 
-    valores = [a.valor_co2_kg for a in analisis_db.values()]
-    por_categoria: dict = {}
-    por_nivel: dict = {}
+    def test_crear_analisis_devuelve_id(self):
+        payload = {
+            "nombre": "Viaje en coche",
+            "categoria": "transporte",
+            "valor_co2_kg": 12.0
+        }
+        data = client.post("/analisis", json=payload).json()
+        assert "id" in data
+        assert isinstance(data["id"], int)
 
-    for a in analisis_db.values():
-        por_categoria[a.categoria] = (
-            por_categoria.get(a.categoria, 0) + a.valor_co2_kg
-        )
-        por_nivel[a.nivel_impacto] = por_nivel.get(a.nivel_impacto, 0) + 1
+    def test_crear_analisis_asigna_nivel_impacto(self):
+        payload = {
+            "nombre": "Residuos semanales",
+            "categoria": "residuos",
+            "valor_co2_kg": 5.0
+        }
+        data = client.post("/analisis", json=payload).json()
+        assert data["nivel_impacto"] == "bajo"
 
-    return {
-        "total_analisis": len(analisis_db),
-        "co2_total_kg": round(sum(valores), 2),
-        "co2_promedio_kg": round(sum(valores) / len(valores), 2),
-        "co2_maximo_kg": round(max(valores), 2),
-        "co2_minimo_kg": round(min(valores), 2),
-        "por_categoria": {k: round(v, 2) for k, v in por_categoria.items()},
-        "por_nivel_impacto": por_nivel,
-    }
+    def test_crear_analisis_nivel_impacto_critico(self):
+        payload = {
+            "nombre": "Fábrica industrial",
+            "categoria": "energia",
+            "valor_co2_kg": 500.0
+        }
+        data = client.post("/analisis", json=payload).json()
+        assert data["nivel_impacto"] == "critico"
+
+    def test_crear_analisis_con_descripcion(self):
+        payload = {
+            "nombre": "Test",
+            "categoria": "agua",
+            "valor_co2_kg": 3.0,
+            "descripcion": "Descripción detallada"
+        }
+        data = client.post("/analisis", json=payload).json()
+        assert data["descripcion"] == "Descripción detallada"
+
+    def test_crear_analisis_categoria_invalida(self):
+        payload = {
+            "nombre": "Test inválido",
+            "categoria": "nuclear",
+            "valor_co2_kg": 10.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_crear_analisis_co2_negativo(self):
+        payload = {
+            "nombre": "Test negativo",
+            "categoria": "energia",
+            "valor_co2_kg": -5.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_crear_analisis_co2_cero(self):
+        payload = {
+            "nombre": "Test cero",
+            "categoria": "energia",
+            "valor_co2_kg": 0.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_crear_analisis_nombre_vacio(self):
+        payload = {
+            "nombre": "",
+            "categoria": "energia",
+            "valor_co2_kg": 10.0
+        }
+        response = client.post("/analisis", json=payload)
+        assert response.status_code == 422
+
+    def test_obtener_analisis_existente(self):
+        payload = {
+            "nombre": "Test obtener",
+            "categoria": "transporte",
+            "valor_co2_kg": 20.0
+        }
+        creado = client.post("/analisis", json=payload).json()
+        response = client.get(f"/analisis/{creado['id']}")
+        assert response.status_code == 200
+        assert response.json()["id"] == creado["id"]
+
+    def test_obtener_analisis_no_existente(self):
+        response = client.get("/analisis/99999")
+        assert response.status_code == 404
+
+    def test_listar_analisis_tras_crear(self):
+        for i in range(3):
+            client.post("/analisis", json={
+                "nombre": f"Análisis {i}",
+                "categoria": "energia",
+                "valor_co2_kg": float(i + 1)
+            })
+        response = client.get("/analisis")
+        assert len(response.json()) == 3
+
+    def test_eliminar_analisis_existente(self):
+        creado = client.post("/analisis", json={
+            "nombre": "Borrar",
+            "categoria": "agua",
+            "valor_co2_kg": 1.0
+        }).json()
+        response = client.delete(f"/analisis/{creado['id']}")
+        assert response.status_code == 200
+
+    def test_eliminar_analisis_no_aparece_despues(self):
+        creado = client.post("/analisis", json={
+            "nombre": "Borrar check",
+            "categoria": "agua",
+            "valor_co2_kg": 1.0
+        }).json()
+        client.delete(f"/analisis/{creado['id']}")
+        assert client.get(f"/analisis/{creado['id']}").status_code == 404
+
+    def test_eliminar_analisis_no_existente(self):
+        response = client.delete("/analisis/99999")
+        assert response.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════
+# PRUEBAS DE INTEGRACIÓN — Estadísticas
+# ═══════════════════════════════════════════════════════════
+
+class TestEstadisticas:
+
+    def setup_method(self):
+        analisis_db.clear()
+
+    def test_estadisticas_sin_datos(self):
+        response = client.get("/estadisticas")
+        assert response.status_code == 200
+        assert response.json()["total_analisis"] == 0
+
+    def test_estadisticas_co2_total(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 10.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "transporte", "valor_co2_kg": 20.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_total_kg"] == 30.0
+
+    def test_estadisticas_promedio(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 10.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "energia", "valor_co2_kg": 30.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_promedio_kg"] == 20.0
+
+    def test_estadisticas_maximo_minimo(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "agua", "valor_co2_kg": 5.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "agua", "valor_co2_kg": 100.0})
+        data = client.get("/estadisticas").json()
+        assert data["co2_maximo_kg"] == 100.0
+        assert data["co2_minimo_kg"] == 5.0
+
+    def test_estadisticas_por_categoria(self):
+        client.post("/analisis", json={
+            "nombre": "A", "categoria": "energia", "valor_co2_kg": 15.0})
+        client.post("/analisis", json={
+            "nombre": "B", "categoria": "transporte", "valor_co2_kg": 25.0})
+        data = client.get("/estadisticas").json()
+        assert "energia" in data["por_categoria"]
+        assert "transporte" in data["por_categoria"]
+
+    def test_estadisticas_por_nivel_impacto(self):
+        client.post("/analisis", json={
+            "nombre": "Bajo", "categoria": "agua", "valor_co2_kg": 5.0})
+        client.post("/analisis", json={
+            "nombre": "Critico", "categoria": "energia", "valor_co2_kg": 300.0})
+        data = client.get("/estadisticas").json()
+        assert "bajo" in data["por_nivel_impacto"]
+        assert "critico" in data["por_nivel_impacto"]
+
+    def test_estadisticas_total_analisis(self):
+        for i in range(5):
+            client.post("/analisis", json={
+                "nombre": f"Test {i}",
+                "categoria": "residuos",
+                "valor_co2_kg": float(i + 1)
+            })
+        data = client.get("/estadisticas").json()
+        assert data["total_analisis"] == 5

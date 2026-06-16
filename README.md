@@ -1,10 +1,12 @@
 # 🌿 EcoAnalyzer — Microservicio
 
 Repositorio del microservicio **EcoAnalyzer**, desarrollado como Trabajo de Fin 
-de Grado en Ingeniería Informática. EcoAnalyzer es una API REST orientada al 
-análisis de huella de carbono y consumo energético, desarrollada con 
-**Python** y **FastAPI**, desplegada automáticamente en **Microsoft Azure** 
-mediante pipelines CI/CD con **GitHub Actions**.
+de Grado en Ingeniería Informática. Esta herramienta, bautizada como EcoAnalyzer, 
+tiene como propósito evaluar el impacto energético y la huella de carbono. 
+Para su construcción, se ha seleccionado el lenguaje **Python** en combinación 
+con el framework **FastAPI**, desplegada automáticamente en **Microsoft Azure** 
+mediante pipelines CI/CD con **GitHub Actions**, con gestión segura de secretos 
+mediante **Azure Key Vault**.
 
 ---
 
@@ -14,22 +16,25 @@ mediante pipelines CI/CD con **GitHub Actions**.
 - **Gestión de análisis medioambientales** con cálculo automático del nivel de impacto
 - **Estadísticas agregadas** de CO₂ por categoría y nivel de impacto
 - **Categorías**: energía, transporte, residuos y agua
-- **Health check** con información del entorno y versión
+- **Health check** con información del entorno, versión y estado de conexión 
+  con Azure Key Vault
+- **Integración con Azure Key Vault** para lectura segura de secretos en 
+  tiempo de ejecución
 
 ---
 
-## Endpoints
+## Especificación de Endpoints de la API
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/` | Landing page visual HTML |
-| `GET` | `/health` | Health check con entorno y timestamp |
-| `GET` | `/categorias` | Listar categorías disponibles |
-| `GET` | `/analisis` | Listar todos los análisis |
-| `GET` | `/analisis/{id}` | Obtener análisis por ID |
-| `POST` | `/analisis` | Crear nuevo análisis |
-| `DELETE` | `/analisis/{id}` | Eliminar análisis por ID |
-| `GET` | `/estadisticas` | Estadísticas agregadas de CO₂ |
+| Verbo HTTP | Dirección del Recurso | Propósito y Respuesta del Servicio |
+| :--- | :--- | :--- |
+| **GET** | `/` | Renderizado de la interfaz gráfica principal (Página de inicio en HTML). |
+| **GET** | `/health` | Diagnóstico del estado del sistema, incluyendo entorno, versión, estado de Key Vault y marca de tiempo. |
+| **GET** | `/categorias` | Consulta del catálogo completo de clasificaciones disponibles en la plataforma. |
+| **GET** | `/analisis` | Recuperación del histórico global de registros evaluados. |
+| **GET** | `/analisis/{id}` | Extracción de un reporte específico utilizando su identificador único. |
+| **GET** | `/estadisticas` | Cálculo de métricas consolidadas y datos acumulados sobre emisiones de CO₂. |
+| **POST** | `/analisis` | Procesamiento e inserción de un nuevo estudio o registro en el sistema. |
+| **DELETE** | `/analisis/{id}` | Remoción o purga de un registro específico mediante su ID. |
 
 Documentación interactiva disponible en `/docs` (Swagger UI).
 
@@ -39,6 +44,7 @@ Documentación interactiva disponible en `/docs` (Swagger UI).
 
 ```
 microservicio/
+├── README.md 		                  # Manual de instrucciones y guía de uso del proyecto.
 ├── main.py                         # Aplicación FastAPI — EcoAnalyzer
 ├── requirements.txt                # Dependencias Python
 ├── test_main.py                    # 57 pruebas automatizadas (pytest)
@@ -50,7 +56,38 @@ microservicio/
         ├── cd.yml                  # Pipeline CD — despliegue PRE y PRO
         └── codeql.yml              # Análisis de seguridad CodeQL
 ```
+---
 
+## Integración con Azure Key Vault
+
+El microservicio lee el secreto `eco-api-secret` desde Azure Key Vault en 
+tiempo de arranque mediante `DefaultAzureCredential`. La URI del vault se 
+inyecta como variable de entorno `KEY_VAULT_URI` a través del servicio 
+systemd, cuyo valor es provisionado automáticamente por Terraform y pasado 
+por Ansible sin ningún valor hardcodeado.
+
+El endpoint `/health` expone el campo `kv_conectado` indicando si la 
+conexión con Key Vault se ha establecido correctamente:
+
+```json
+{
+  "status": "ok",
+  "entorno": "PRE",
+  "kv_conectado": true,
+  "timestamp": "2026-05-26T18:49:58.936895"
+}
+```
+
+La cadena de inyección es la siguiente:
+
+```mermaid
+graph TD
+    A[Terraform: output key_vault_uri] --> B[API Terraform Cloud]
+    B --> C[Workflow Ansible: GitHub Actions]
+    C --> D[Servicio systemd: Environment=KEY_VAULT_URI=...]
+    D --> E[main.py: os.getenv]
+    E --> F[Azure Key Vault SDK]
+```
 ---
 
 ## Pipelines CI/CD
@@ -59,9 +96,7 @@ microservicio/
 
 Se dispara automáticamente al abrir una PR hacia `main`.
 
-```
 Checkout → Python 3.11 → Instalar deps → flake8 → pytest + cobertura ≥ 80%
-```
 
 El merge queda **bloqueado** si alguna validación falla.
 
@@ -69,20 +104,21 @@ El merge queda **bloqueado** si alguna validación falla.
 
 Se dispara automáticamente al hacer merge a `main`.
 
-```
-validacion → despliegue-pre → pruebas-integracion → despliegue-pro
-                                                     (aprobación humana)
-```
+validacion → despliegue-pre → pruebas-integracion → despliegue-pro (aprobación humana)
 
-| Job | Descripción |
-|---|---|
-| `validacion` | Repite las validaciones de CI |
-| `despliegue-pre` | Obtiene IP de Azure, despliega en PRE via SSH |
-| `pruebas-integracion` | Health check, landing page, categorías, análisis, estadísticas |
-| `despliegue-pro` | Aprobación humana + despliegue en PRO + health check |
+### Estado y Ejecución de las Etapas del Pipeline
 
-La IP de las VMs se obtiene automáticamente desde **Azure CLI** 
-sin necesidad de configurar ninguna variable manual.
+| Tarea Operativa | Resultado | Descripción Técnica del Proceso |
+| :--- | :--- | :--- |
+| **Etapa de Inspección** | Exitoso | Análisis estático de código con *flake8*, ejecución de tests con *pytest* y reporte de cobertura. |
+| **Lanzamiento en Staging** | Exitoso | Transferencia por *SCP*, actualización del entorno virtual (*venv*) y reinicio del servicio vía *systemctl*. |
+| **Validación Funcional** | Exitoso | Verificación de *endpoints* críticos: estado del sistema, portada, catálogo, inserción de registros y métricas. |
+| **Control de Pase a producción** | Exitoso | Filtro de supervisión manual completado — Autorizado por el ingeniero de guardia: Javier. |
+| **Liberación Definitiva** | Exitoso | Confirmación de cambio único, despliegue automatizado y test de disponibilidad final en el entorno real (*PRO*). |
+
+La IP de las VMs y la URI de Azure Key Vault se obtienen automáticamente 
+desde la API de **Terraform Cloud** sin necesidad de configurar ningún 
+valor manual.
 
 ### CodeQL — Análisis de seguridad (`codeql.yml`)
 
@@ -94,7 +130,15 @@ push a main y automáticamente cada lunes. Los resultados aparecen en
 
 ## Pruebas
 
-57 pruebas organizadas en 5 clases cubriendo los tres niveles de la pirámide:
+El almacenamiento en memoria es una decisión de diseño deliberada: elimina 
+dependencias externas innecesarias, garantiza que cada ciclo de despliegue 
+parte de un estado limpio y predecible, y permite que los 57 tests sean 
+completamente deterministas al no depender de estado previo persistido. 
+En un escenario productivo real se sustituiría por Azure Cosmos DB o 
+Azure Database for PostgreSQL, ambos provisionables mediante Terraform.
+
+La suite de calidad consta de 57 validaciones organizadas en 5 clases, 
+abarcando las tres capas del modelo jerárquico de pruebas.
 
 | Clase | Tipo | Nº pruebas | Descripción |
 |---|---|---|---|
@@ -129,7 +173,8 @@ pytest test_main.py -v --cov=main --cov-report=term-missing
 
 ### Entorno `pre` (GitHub Environments)
 
-No requiere variables adicionales. La IP se obtiene automáticamente desde Azure.
+No requiere variables adicionales. La IP de la VM y la URI de Key Vault 
+se obtienen automáticamente desde la API de Terraform Cloud.
 
 ### Entorno `pro` (GitHub Environments)
 
@@ -159,6 +204,10 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Abre [http://localhost:8000](http://localhost:8000) para ver la landing page.
+
+En local, si no se define `KEY_VAULT_URI`, el microservicio arranca 
+correctamente sin conectarse a Key Vault y el campo `kv_conectado` 
+del health check devuelve `false`.
 
 ### Ejecutar pruebas
 ```bash
@@ -197,5 +246,8 @@ Categorías válidas: `energia`, `transporte`, `residuos`, `agua`
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Azure Key Vault Documentation](https://learn.microsoft.com/en-us/azure/key-vault)
 - [CodeQL Documentation](https://codeql.github.com/docs)
 - [pytest Documentation](https://docs.pytest.org)
+
+

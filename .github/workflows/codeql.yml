@@ -13,6 +13,9 @@ jobs:
   analisis-codeql:
     name: Análisis de seguridad CodeQL
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     permissions:
       actions: read
       contents: read
@@ -20,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Inicializar CodeQL
         uses: github/codeql-action/init@v3

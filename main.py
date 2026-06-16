@@ -1,17 +1,31 @@
+import datetime
+import os
+from typing import Optional
+
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from typing import Optional
-import datetime
-import os
 
 app = FastAPI(
     title="EcoAnalyzer API",
     description="Servicio de análisis de huella de carbono y consumo energético",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 ENTORNO = os.getenv("ENTORNO", "PRE")
+KEY_VAULT_URI = os.getenv("KEY_VAULT_URI", "")
+APP_SECRET = "no-configurado"
+
+# Inicialización segura de Azure Key Vault (no bloquea el entorno de pruebas)
+if KEY_VAULT_URI:
+    try:
+        credential = DefaultAzureCredential()
+        client = SecretClient(vault_url=KEY_VAULT_URI, credential=credential)
+        APP_SECRET = client.get_secret("eco-api-secret").value
+    except Exception as e:
+        APP_SECRET = f"error-al-leer-kv: {e}"
 
 # ─────────────────────────────────────────────
 # Modelos
@@ -20,7 +34,9 @@ ENTORNO = os.getenv("ENTORNO", "PRE")
 
 class Analisis(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
-    categoria: str = Field(..., description="energia | transporte | residuos | agua")
+    categoria: str = Field(
+        ..., description="energia | transporte | residuos | agua"
+    )
     valor_co2_kg: float = Field(..., gt=0)
     descripcion: Optional[str] = None
 
@@ -229,10 +245,9 @@ def landing():
 def health():
     return {
         "status": "ok",
-        "servicio": "ecoanalyzer",
         "entorno": ENTORNO,
-        "version": "1.0.0",
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "kv_conectado": KEY_VAULT_URI != "",
+        "timestamp": datetime.datetime.utcnow().isoformat(),
     }
 
 
@@ -243,14 +258,26 @@ def health():
 def listar_categorias():
     return {
         "categorias": [
-            {"id": "energia", "nombre": "Energía",
-             "descripcion": "Consumo eléctrico y combustibles"},
-            {"id": "transporte", "nombre": "Transporte",
-             "descripcion": "Emisiones por desplazamiento"},
-            {"id": "residuos", "nombre": "Residuos",
-             "descripcion": "Generación y gestión de residuos"},
-            {"id": "agua", "nombre": "Agua",
-             "descripcion": "Consumo y tratamiento de agua"},
+            {
+                "id": "energia",
+                "nombre": "Energía",
+                "descripcion": "Consumo eléctrico y combustibles",
+            },
+            {
+                "id": "transporte",
+                "nombre": "Transporte",
+                "descripcion": "Emisiones por desplazamiento",
+            },
+            {
+                "id": "residuos",
+                "nombre": "Residuos",
+                "descripcion": "Generación y gestión de residuos",
+            },
+            {
+                "id": "agua",
+                "nombre": "Agua",
+                "descripcion": "Consumo y tratamiento de agua",
+            },
         ]
     }
 
@@ -267,8 +294,7 @@ def listar_analisis():
 def obtener_analisis(analisis_id: int):
     if analisis_id not in analisis_db:
         raise HTTPException(
-            status_code=404,
-            detail=f"Análisis {analisis_id} no encontrado"
+            status_code=404, detail=f"Análisis {analisis_id} no encontrado"
         )
     return analisis_db[analisis_id]
 
@@ -279,7 +305,7 @@ def crear_analisis(analisis: Analisis):
     if analisis.categoria not in CATEGORIAS_VALIDAS:
         raise HTTPException(
             status_code=422,
-            detail=f"Categoría inválida. Válidas: {CATEGORIAS_VALIDAS}"
+            detail=f"Categoría inválida. Válidas: {CATEGORIAS_VALIDAS}",
         )
     nuevo = AnalisisResponse(
         id=contador_id,
@@ -288,7 +314,7 @@ def crear_analisis(analisis: Analisis):
         valor_co2_kg=analisis.valor_co2_kg,
         descripcion=analisis.descripcion,
         nivel_impacto=calcular_nivel_impacto(analisis.valor_co2_kg),
-        creado_en=datetime.datetime.utcnow().isoformat()
+        creado_en=datetime.datetime.utcnow().isoformat(),
     )
     analisis_db[contador_id] = nuevo
     contador_id += 1
@@ -299,8 +325,7 @@ def crear_analisis(analisis: Analisis):
 def eliminar_analisis(analisis_id: int):
     if analisis_id not in analisis_db:
         raise HTTPException(
-            status_code=404,
-            detail=f"Análisis {analisis_id} no encontrado"
+            status_code=404, detail=f"Análisis {analisis_id} no encontrado"
         )
     del analisis_db[analisis_id]
     return {"mensaje": f"Análisis {analisis_id} eliminado correctamente"}
@@ -319,7 +344,7 @@ def obtener_estadisticas():
             "co2_maximo_kg": 0,
             "co2_minimo_kg": 0,
             "por_categoria": {},
-            "por_nivel_impacto": {}
+            "por_nivel_impacto": {},
         }
 
     valores = [a.valor_co2_kg for a in analisis_db.values()]
@@ -327,12 +352,10 @@ def obtener_estadisticas():
     por_nivel: dict = {}
 
     for a in analisis_db.values():
-        por_categoria[a.categoria] = por_categoria.get(
-            a.categoria, 0
-        ) + a.valor_co2_kg
-        por_nivel[a.nivel_impacto] = por_nivel.get(
-            a.nivel_impacto, 0
-        ) + 1
+        por_categoria[a.categoria] = (
+            por_categoria.get(a.categoria, 0) + a.valor_co2_kg
+        )
+        por_nivel[a.nivel_impacto] = por_nivel.get(a.nivel_impacto, 0) + 1
 
     return {
         "total_analisis": len(analisis_db),
@@ -341,5 +364,5 @@ def obtener_estadisticas():
         "co2_maximo_kg": round(max(valores), 2),
         "co2_minimo_kg": round(min(valores), 2),
         "por_categoria": {k: round(v, 2) for k, v in por_categoria.items()},
-        "por_nivel_impacto": por_nivel
+        "por_nivel_impacto": por_nivel,
     }
