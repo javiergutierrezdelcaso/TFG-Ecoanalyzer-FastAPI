@@ -5,50 +5,50 @@ on:
     branches:
       - main
 
-# 💡 SOLUCIÓN AL WARNING: Activamos la bandera que pide GitHub para saltar a Node 24
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout del código de la PR
+      # 1. Checkout del código usando la versión nativa para Node 24
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
-      # 2. Configurar Python
+      # 2. Configurar Python usando la versión que soporta Node 24 sin advertencias
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # 3. Instalar dependencias
+      # 3. Instalar dependencias esenciales y de test en un solo bloque unificado
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           pip install fastapi pydantic azure-identity azure-keyvault-secrets uvicorn
           pip install pytest pytest-cov flake8 httpx
 
-      # 4. Análisis de código con flake8
+      # 4. Análisis estático (Flake8)
       - name: Análisis de código (flake8)
         run: |
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      # 5. Pruebas automatizadas con cobertura
-      # SOLUCIÓN AL ARTEFACTO: Ejecutarlo como módulo de python (python -m pytest) 
-      # garantiza que el plugin pytest-cov escriba el archivo físico `.coverage` en la raíz.
+      # 5. Forzamos la creación del archivo de cobertura usando el módulo de python directo
       - name: Pruebas y cobertura de código
         run: |
-          python -m pytest test_main.py -v --cov=. --cov-report=term-missing --cov-fail-under=80
+          python -m pytest test_main.py -v \
+            --cov=. \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80
 
-      # 6. Publicar resultado de cobertura en la PR
+      # 6. Guardar artefactos usando la última versión estable compatible con Node 24
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: coverage-report
-          path: .coverage
+          path: |
+            .coverage
+            coverage.xml
