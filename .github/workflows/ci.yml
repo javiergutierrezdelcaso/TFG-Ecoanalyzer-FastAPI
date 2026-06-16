@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+# 💡 SOLUCIÓN AL WARNING: Activamos la bandera que pide GitHub para saltar a Node 24
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   ci:
     name: Compilación, análisis y pruebas
@@ -23,7 +27,6 @@ jobs:
           cache: "pip"
 
       # 3. Instalar dependencias
-      # Forzamos la instalación limpia de FastAPI, Pytest y el plugin de cobertura
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
@@ -36,24 +39,16 @@ jobs:
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
       # 5. Pruebas automatizadas con cobertura
-      # 💡 CAMBIO CRÍTICO: Usamos '--cov=main' y añadimos '--cov-instance-of' 
-      # para obligar a pytest a volcar el archivo físico de cobertura (.coverage).
+      # SOLUCIÓN AL ARTEFACTO: Ejecutarlo como módulo de python (python -m pytest) 
+      # garantiza que el plugin pytest-cov escriba el archivo físico `.coverage` en la raíz.
       - name: Pruebas y cobertura de código
         run: |
-          python -m pytest test_main.py -v \
-            --cov=main \
-            --cov-report=term-missing \
-            --cov-report=xml \
-            --cov-fail-under=80
+          python -m pytest test_main.py -v --cov=. --cov-report=term-missing --cov-fail-under=80
 
       # 6. Publicar resultado de cobertura en la PR
-      # 💡 SOLUCIÓN DEL ARTEFACTO: Ahora que se genera el reporte, guardamos el XML 
-      # o el archivo base de cobertura sin que falte ningún archivo.
       - name: Publicar cobertura en PR
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: |
-            .coverage
-            coverage.xml
+          path: .coverage
