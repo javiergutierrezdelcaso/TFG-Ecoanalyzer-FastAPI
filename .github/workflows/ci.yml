@@ -4,12 +4,13 @@ on:
   pull_request:
     branches:
       - main
-env:
-  NODE_NO_WARNINGS: "1"
+
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
+    env:
+      NODE_NO_WARNINGS: "1"
     steps:
       # 1. Checkout del código (Las últimas revisiones de v4 ya no disparan el warning)
       - name: Checkout código
