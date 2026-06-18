@@ -9,19 +9,14 @@ jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
-    
-    # 🤫 Forzamos al sistema de anotaciones de GitHub a ignorar las advertencias de Node
-    env:
-      ACTIONS_STEP_DEBUG: "false"
-
     steps:
-      # 1. Checkout del código
+      # 1. Checkout del código (Apuntando a la última revisión limpia de v4)
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
-      # 2. Configurar Python
+      # 2. Configurar Python (v5.4.0 ya no genera advertencias en Node 24)
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0
         with:
           python-version: "3.11"
 
@@ -42,10 +37,10 @@ jobs:
         run: |
           python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura
+      # 6. Guardar el artefacto de cobertura (v4.6.1 limpia las alertas de Node 24)
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.1
         with:
           name: coverage-report
           path: coverage.xml
