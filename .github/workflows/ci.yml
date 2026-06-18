@@ -10,16 +10,13 @@ jobs:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout del código usando Git Nativo (Evita Node por completo)
+      # 1. Checkout del código (Apuntando a la última revisión limpia de v4)
       - name: Checkout código
-        run: |
-          git clone --depth=1 https://github.com/${{ github.repository }}.git .
-          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
-          git checkout pr-${{ github.event.pull_request.number }}
+        uses: actions/checkout@v5
 
-      # 2. Configurar Python (v5.4.0 resuelve internamente los problemas de Node 24)
+      # 2. Configurar Python (v5.4.0 ya no genera advertencias en Node 24)
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5.4.0
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -40,12 +37,10 @@ jobs:
         run: |
           python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura utilizando la API de GitHub en Bash
+      # 6. Guardar el artefacto de cobertura (v4.6.1 limpia las alertas de Node 24)
       - name: Publicar cobertura en PR
         if: always()
-        run: |
-          if [ -f "coverage.xml" ]; then
-            echo "Reporte de cobertura 'coverage.xml' generado con éxito en el espacio de trabajo."
-          else
-            echo "No se encontró el reporte de cobertura."
-          fi
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: coverage.xml
