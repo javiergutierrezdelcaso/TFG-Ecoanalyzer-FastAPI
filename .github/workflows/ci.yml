@@ -9,10 +9,8 @@ jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
-    env:
-      NODE_NO_WARNINGS: "1"
     steps:
-      # 1. Checkout del código (Las últimas revisiones de v4 ya no disparan el warning)
+      # 1. Checkout del código (Se mantiene v4, pero GitHub ya parchó los releases menores internos)
       - name: Checkout código
         uses: actions/checkout@v4
 
