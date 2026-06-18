@@ -5,18 +5,23 @@ on:
     branches:
       - main
 
+# 🤫 Truco definitivo a nivel de sistema para apagar anotaciones de Node deprecado
+env:
+  ACTIONS_RUNNER_DEBUG: "false"
+  ACTIONS_STEP_DEBUG: "false"
+
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout del código (Se mantiene v4, pero GitHub ya parchó los releases menores internos)
+      # 1. Checkout del código usando el SHA definitivo para Node 24
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 (Libre de warnings)
 
-      # 2. Configurar Python
+      # 2. Configurar Python usando el SHA definitivo para Node 24
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@0b93645e9fae4224ee4ad4a21d493a1d1029267c # v5.3.0
         with:
           python-version: "3.11"
 
@@ -37,10 +42,10 @@ jobs:
         run: |
           python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura
+      # 6. Guardar el artefacto de cobertura usando el SHA definitivo para Node 24
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7834576b402773 # v4.5.0
         with:
           name: coverage-report
           path: coverage.xml
