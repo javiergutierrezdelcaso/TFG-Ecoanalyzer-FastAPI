@@ -5,11 +5,6 @@ on:
     branches:
       - main
 
-# 💡 SOLUCIÓN CORRECTA PARA NODE 24:
-# Forzamos el uso de Node 24 de manera limpia en todo el workflow.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   ci:
     name: Compilación, análisis y pruebas
