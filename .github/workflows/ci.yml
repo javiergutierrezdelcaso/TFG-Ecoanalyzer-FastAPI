@@ -4,7 +4,8 @@ on:
   pull_request:
     branches:
       - main
-
+env:
+  NODE_NO_WARNINGS: "1"
 jobs:
   ci:
     name: Compilación, análisis y pruebas
