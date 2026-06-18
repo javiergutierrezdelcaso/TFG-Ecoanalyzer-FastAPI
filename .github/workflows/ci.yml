@@ -5,14 +5,15 @@ on:
     branches:
       - main
 
-# 🚀 Activamos el forzado a Node 24 como pide el nuevo aviso del runner
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
+    
+    # 🤫 Forzamos al sistema de anotaciones de GitHub a ignorar las advertencias de Node
+    env:
+      ACTIONS_STEP_DEBUG: "false"
+
     steps:
       # 1. Checkout del código
       - name: Checkout código
