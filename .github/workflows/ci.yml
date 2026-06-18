@@ -4,7 +4,8 @@ on:
   pull_request:
     branches:
       - main
-
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "false"
 jobs:
   ci:
     name: Compilación, análisis y pruebas
