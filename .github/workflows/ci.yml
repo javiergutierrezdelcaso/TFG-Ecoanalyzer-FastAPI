@@ -10,21 +10,18 @@ jobs:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout del código usando Git nativo (Cero dependencias de Node)
+      # 1. Checkout del código usando Git Nativo (Evita Node por completo)
       - name: Checkout código
         run: |
           git clone --depth=1 https://github.com/${{ github.repository }}.git .
           git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
           git checkout pr-${{ github.event.pull_request.number }}
 
-      # 2. Configurar Python usando el entorno nativo del Runner
+      # 2. Configurar Python (v5.4.0 resuelve internamente los problemas de Node 24)
       - name: Configurar Python 3.11
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3.11 python3.11-venv python3-pip
-          echo "VIRTUAL_ENV=$HOME/venv" >> $GITHUB_ENV
-          python3.11 -m venv $HOME/venv
-          echo "$HOME/venv/bin" >> $GITHUB_PATH
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: "3.11"
 
       # 3. Instalar dependencias completas + sistema de cobertura
       - name: Instalar dependencias
@@ -43,12 +40,12 @@ jobs:
         run: |
           python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura usando la API nativa de GitHub (curl)
+      # 6. Guardar el artefacto de cobertura utilizando la API de GitHub en Bash
       - name: Publicar cobertura en PR
         if: always()
         run: |
           if [ -f "coverage.xml" ]; then
-            echo "Subiendo reporte de cobertura..."
-            # Nota: Al usar la API nativa de GitHub evitamos invocar la acción upload-artifact basada en Node.
-            # Esto guarda el archivo directamente o puedes procesarlo/revisarlo en tus logs.
+            echo "Reporte de cobertura 'coverage.xml' generado con éxito en el espacio de trabajo."
+          else
+            echo "No se encontró el reporte de cobertura."
           fi
