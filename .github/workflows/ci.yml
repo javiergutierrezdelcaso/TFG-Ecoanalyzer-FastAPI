@@ -5,23 +5,18 @@ on:
     branches:
       - main
 
-# 💡 SOLUCIÓN CORRECTA PARA NODE 24:
-# Forzamos el uso de Node 24 de manera limpia en todo el workflow.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   ci:
     name: Compilación, análisis y pruebas
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout del código
+      # 1. Checkout del código (Apuntando a la última revisión limpia de v4)
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # 2. Configurar Python (Sin caché por el error 400)
+      # 2. Configurar Python (v5.4.0 ya no genera advertencias en Node 24)
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -37,15 +32,15 @@ jobs:
         run: |
           flake8 . --max-line-length=120 --exclude=.git,__pycache__,test_main.py
 
-      # 5. Pruebas y generación de reporte de cobertura (Cambiado a formato XML para asegurar el archivo)
+      # 5. Pruebas y generación de reporte de cobertura
       - name: Pruebas y cobertura de código
         run: |
           python -m pytest test_main.py -v --cov=. --cov-report=xml --cov-report=term-missing
 
-      # 6. Guardar el artefacto de cobertura (Ahora buscará 'coverage.xml')
+      # 6. Guardar el artefacto de cobertura (v4.6.1 limpia las alertas de Node 24)
       - name: Publicar cobertura en PR
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: coverage.xml
