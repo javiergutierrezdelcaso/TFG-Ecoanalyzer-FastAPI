@@ -5,9 +5,9 @@ on:
     branches:
       - main
 
-# ⚙️ El truco oficial de GitHub para silenciar los warnings de la transición a Node 24
+# 🚀 Activamos el forzado a Node 24 como pide el nuevo aviso del runner
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   ci:
