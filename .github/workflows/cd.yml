@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # v4 es la versión oficial y estable
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -51,7 +51,7 @@ jobs:
     outputs:
       vm_ip: ${{ steps.get_ip.outputs.vm_ip }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Login en Azure CLI
         uses: azure/login@v3
@@ -153,7 +153,7 @@ jobs:
     needs: pruebas-integracion
     environment: pro
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Login en Azure CLI
         uses: azure/login@v3
