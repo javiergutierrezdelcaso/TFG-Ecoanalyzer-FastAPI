@@ -8,7 +8,6 @@ con el framework **FastAPI**, desplegada automáticamente en **Microsoft Azure**
 mediante pipelines CI/CD con **GitHub Actions**, con gestión segura de secretos 
 mediante **Azure Key Vault**.
 
-
 ---
 
 ## Funcionalidades
