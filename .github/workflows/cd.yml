@@ -145,10 +145,10 @@ jobs:
             | grep -i "total_analisis"
 
   # ─────────────────────────────────────────────
-  # JOB 4: Aprobación humana + Despliegue PRO
+  # JOB 4: Aprobación, Despliegue y pruebas en PRO
   # ─────────────────────────────────────────────
   despliegue-pro:
-    name: Aprobación y despliegue a PRO
+    name: Aprobación, Despliegue y pruebas en PRO
     runs-on: ubuntu-latest
     needs: pruebas-integracion
     environment: pro
